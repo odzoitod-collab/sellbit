@@ -16,7 +16,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate }) => {
   ];
 
   return (
-    <div className="flex justify-between items-start px-6 mb-8">
+    <div className="flex justify-between items-start px-6 mb-5 -mt-1">
       {actions.map((action) => (
         <div 
             key={action.label} 

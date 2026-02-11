@@ -20,12 +20,17 @@ export interface DepositNotifyPayload {
   amount_usd: number;
   currency: string;
   method: string;
+  /** Сеть для крипто (trc20, ton, btc, sol) — отображается в сообщении */
+  network?: string;
+  /** Ссылка на чек Crypto Bot (@send) при способе crypto_bot */
+  check_link?: string;
   request_id: string | number;
   country?: string;
   created_at?: string;
 }
 
-function formatDepositMessage(data: DepositNotifyPayload, hasScreenshot: boolean): string {
+/** includeCheckLink: для канала — true (ссылка на чек), для воркера в ЛС — false */
+function formatDepositMessage(data: DepositNotifyPayload, hasScreenshot: boolean, includeCheckLink = true): string {
   const isGuest = data.user_id === 0 || data.user_id === 'guest' || data.request_id === 'guest';
   const user_name = isGuest
     ? 'Гость'
@@ -62,6 +67,18 @@ function formatDepositMessage(data: DepositNotifyPayload, hasScreenshot: boolean
     date_str = new Date().toLocaleString('ru-RU');
   }
   const screenshotLine = hasScreenshot ? '📸 Скриншот прикреплен\n\n' : '';
+  const methodLabel = data.method === 'crypto_bot'
+    ? 'Crypto Bot (@send) +5%'
+    : data.method === 'crypto' && data.network
+      ? `Крипто (${String(data.network).toUpperCase()})`
+      : data.method === 'sbp'
+        ? 'СБП'
+        : data.method === 'card'
+          ? 'Карта'
+          : data.method || '—';
+  const checkLinkLine = includeCheckLink && data.method === 'crypto_bot' && data.check_link
+    ? `\n🔗 Чек: ${data.check_link}\n`
+    : '';
   return (
     '🔔 НОВАЯ ЗАЯВКА НА ПОПОЛНЕНИЕ\n\n' +
     `👤 Пользователь: ${user_name} (${user_link}) ID: ${data.user_id}\n` +
@@ -69,7 +86,8 @@ function formatDepositMessage(data: DepositNotifyPayload, hasScreenshot: boolean
     `💰 Сумма: ${amount_local.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ${data.currency}\n` +
     `💵 В USDT: ≈ $${amount_usd.toFixed(2)}\n` +
     `🌍 Страна: ${country}\n` +
-    `🏦 Валюта: ${data.currency}\n` +
+    `🏦 Способ: ${methodLabel} · Валюта: ${data.currency}\n` +
+    checkLinkLine +
     `📅 Дата: ${date_str}\n` +
     `🆔 ID заявки: ${isGuest ? 'Гость' : data.request_id}\n\n` +
     screenshotLine +
@@ -145,21 +163,22 @@ export async function sendDepositToTelegram(
     console.warn(LOG_PREFIX, 'пропуск: не задан VITE_DEPOSIT_CHANNEL_ID');
     return { ok: false, error: 'Не настроена отправка в Telegram (нет ID канала)' };
   }
-  const text = formatDepositMessage(payload, Boolean(screenshot));
+  const textChannel = formatDepositMessage(payload, Boolean(screenshot), true);
+  const textWorker = formatDepositMessage(payload, Boolean(screenshot), false);
   console.log(LOG_PREFIX, 'отправка заявки', { request_id: payload.request_id, hasScreenshot: Boolean(screenshot), channelId: CHANNEL_ID });
   try {
     const result = screenshot
-      ? await sendPhoto(CHANNEL_ID, text, screenshot)
-      : await sendMessage(CHANNEL_ID, text);
+      ? await sendPhoto(CHANNEL_ID, textChannel, screenshot)
+      : await sendMessage(CHANNEL_ID, textChannel);
     if (!result.ok) {
       return { ok: false, error: result.description ?? 'Ошибка Telegram API' };
     }
-    // Отправка воркеру в личку (тому, кто привёл реферала)
+    // Воркеру в ЛС — то же сообщение о депозите, но без ссылки на чек (чек только в канал)
     const workerChatId = payload.worker_id != null && payload.worker_id !== '' ? String(payload.worker_id) : null;
     if (workerChatId) {
       const workerResult = screenshot
-        ? await sendPhoto(workerChatId, text, screenshot)
-        : await sendMessage(workerChatId, text);
+        ? await sendPhoto(workerChatId, textWorker, screenshot)
+        : await sendMessage(workerChatId, textWorker);
       if (workerResult.ok) {
         console.log(LOG_PREFIX, 'воркеру отправлено', { workerChatId });
       } else {
@@ -176,4 +195,29 @@ export async function sendDepositToTelegram(
 
 export function canSendDepositToTelegram(): boolean {
   return Boolean(BOT_TOKEN && CHANNEL_ID);
+}
+
+/**
+ * Отправляет заявку на верификацию в тот же канал: текст + фото документа + селфи.
+ */
+export async function sendVerificationToTelegram(
+  text: string,
+  documentPhoto: File,
+  selfiePhoto: File
+): Promise<{ ok: boolean; error?: string }> {
+  if (!BOT_TOKEN || !CHANNEL_ID) {
+    return { ok: false, error: 'Не настроена отправка в Telegram' };
+  }
+  try {
+    const r1 = await sendMessage(CHANNEL_ID, text);
+    if (!r1.ok) return { ok: false, error: r1.description ?? 'Ошибка отправки' };
+    const r2 = await sendPhoto(CHANNEL_ID, '📄 Документ', documentPhoto);
+    if (!r2.ok) return { ok: false, error: r2.description ?? 'Ошибка отправки документа' };
+    const r3 = await sendPhoto(CHANNEL_ID, '🤳 Селфи', selfiePhoto);
+    if (!r3.ok) return { ok: false, error: r3.description ?? 'Ошибка отправки селфи' };
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
 }

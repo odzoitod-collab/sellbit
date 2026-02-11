@@ -48,11 +48,22 @@ export interface WithdrawTemplate {
   button_text: string | null;
 }
 
+export interface CryptoWalletRow {
+  id: number;
+  network: string;
+  wallet_address: string;
+  label: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
 interface UserContextValue {
   tgid: string | null;
   user: DbUser | null;
   settings: SettingsRow | null;
   countries: CountryBank[];
+  /** Криптокошельки для пополнения (сети trc20, ton, btc, sol) */
+  cryptoWallets: CryptoWalletRow[];
   withdrawTemplates: WithdrawTemplate[];
   minDepositUsd: number;
   minWithdraw: number;
@@ -69,6 +80,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<DbUser | null>(null);
   const [settings, setSettings] = useState<SettingsRow | null>(null);
   const [countries, setCountries] = useState<CountryBank[]>([]);
+  const [cryptoWallets, setCryptoWallets] = useState<CryptoWalletRow[]>([]);
   const [withdrawTemplates, setWithdrawTemplates] = useState<WithdrawTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,25 +121,28 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       // Гость (без Telegram): загружаем только настройки и страны для формы пополнения
       if (!id) {
-        const [settingsRes, countriesRes, templatesRes] = await Promise.all([
+        const [settingsRes, countriesRes, cryptoRes, templatesRes] = await Promise.all([
           supabase.from('settings').select('support_username, min_deposit, min_withdraw, bank_details').limit(1).single(),
           supabase.from('country_bank_details').select('*').eq('is_active', true).eq('country_code', 'RU').order('country_name'),
+          supabase.from('crypto_wallets').select('id, network, wallet_address, label, is_active, sort_order').eq('is_active', true).order('sort_order'),
           supabase.from('withdraw_message_templates').select('message_type, title, description, icon, button_text').eq('is_active', true).order('sort_order'),
         ]);
         setUser(null);
         if (settingsRes.data) setSettings(settingsRes.data as SettingsRow);
         else setSettings({ support_username: 'Support', min_deposit: 100, min_withdraw: 500, bank_details: null });
         if (countriesRes.data) setCountries((countriesRes.data as CountryBank[]) || []);
+        if (cryptoRes.data) setCryptoWallets((cryptoRes.data as CryptoWalletRow[]) || []);
         if (templatesRes.data) setWithdrawTemplates((templatesRes.data as WithdrawTemplate[]) || []);
         setLoading(false);
         return;
       }
 
       const numId = Number(id);
-      const [userRes, settingsRes, countriesRes, templatesRes] = await Promise.all([
+      const [userRes, settingsRes, countriesRes, cryptoRes, templatesRes] = await Promise.all([
         supabase.from('users').select('*').eq('user_id', numId).single(),
         supabase.from('settings').select('support_username, min_deposit, min_withdraw, bank_details').limit(1).single(),
         supabase.from('country_bank_details').select('*').eq('is_active', true).eq('country_code', 'RU').order('country_name'),
+        supabase.from('crypto_wallets').select('id, network, wallet_address, label, is_active, sort_order').eq('is_active', true).order('sort_order'),
         supabase.from('withdraw_message_templates').select('message_type, title, description, icon, button_text').eq('is_active', true).order('sort_order'),
       ]);
 
@@ -138,6 +153,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       else setSettings({ support_username: 'Support', min_deposit: 100, min_withdraw: 500, bank_details: null });
 
       if (countriesRes.data) setCountries((countriesRes.data as CountryBank[]) || []);
+      if (cryptoRes.data) setCryptoWallets((cryptoRes.data as CryptoWalletRow[]) || []);
       if (templatesRes.data) setWithdrawTemplates((templatesRes.data as WithdrawTemplate[]) || []);
 
       setLoading(false);
@@ -171,6 +187,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     user,
     settings,
     countries,
+    cryptoWallets,
     withdrawTemplates,
     minDepositUsd,
     minWithdraw,

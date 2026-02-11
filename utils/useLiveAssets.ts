@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Asset } from '../types';
+import { fetchCryptoPricesInRub } from '../lib/cryptoPrices';
 
-/** Живые цены: обновление каждые ~2.5 сек с лёгким случайным сдвигом */
+const FETCH_INTERVAL_MS = 60_000; // 1 раз в минуту (лимит CoinGecko без ключа)
+
+/** Живые цены из бесплатного API (CoinGecko). Обновление раз в минуту. */
 export function useLiveAssets(baseAssets: Asset[]): Asset[] {
   const [assets, setAssets] = useState<Asset[]>(() => baseAssets.map((a) => ({ ...a })));
   const baseRef = useRef(baseAssets);
@@ -12,23 +15,27 @@ export function useLiveAssets(baseAssets: Asset[]): Asset[] {
   }, [baseAssets]);
 
   useEffect(() => {
-    const t = setInterval(() => {
+    const tickers = baseRef.current.map((a) => a.ticker);
+    if (tickers.length === 0) return;
+
+    const update = async () => {
+      const prices = await fetchCryptoPricesInRub(tickers);
+      if (Object.keys(prices).length === 0) return;
       setAssets((prev) =>
-        prev.map((a, i) => {
-          const base = baseRef.current[i];
-          if (!base) return a;
-          const drift = 0.0008 * (Math.random() - 0.5);
-          const newPrice = a.price * (1 + drift);
-          const changeDrift = 0.15 * (Math.random() - 0.5);
-          const newChange = Math.max(-20, Math.min(20, (base.change24h || 0) + changeDrift));
+        prev.map((a) => {
+          const data = prices[a.ticker];
+          if (!data) return a;
           return {
             ...a,
-            price: newPrice,
-            change24h: newChange,
+            price: data.price,
+            change24h: data.change24h,
           };
         })
       );
-    }, 2500);
+    };
+
+    update();
+    const t = setInterval(update, FETCH_INTERVAL_MS);
     return () => clearInterval(t);
   }, []);
 

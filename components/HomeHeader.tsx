@@ -19,7 +19,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ showBalanceTitle, balance, user
 
   return (
     <header className="sticky top-0 z-50 flex justify-between items-center py-4 px-4 bg-[#050505] border-b border-white/5 transition-all duration-300 shadow-md shadow-black/50">
-      <div className="flex items-center space-x-3 min-w-0">
+      <div className="flex items-center min-w-0">
         {user?.photo_url ? (
           <img
             src={user.photo_url}
@@ -31,9 +31,6 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ showBalanceTitle, balance, user
             <User size={18} />
           </div>
         )}
-        <span className="text-sm font-medium text-white truncate max-w-[120px]">
-          {user?.username || user?.full_name || (user ? 'Профиль' : 'Гость')}
-        </span>
       </div>
 
       <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 pointer-events-none">
@@ -41,7 +38,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ showBalanceTitle, balance, user
           <span className="text-base font-mono font-bold text-white tracking-tight">{formattedBalance} ₽</span>
         </div>
         <div className={`flex flex-col items-center transition-opacity duration-300 ${!showBalanceTitle ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 absolute'}`}>
-          <span className="text-sm font-medium text-neutral-400 uppercase tracking-widest">Баланс</span>
+          <span className="text-sm font-medium text-neutral-400 uppercase tracking-widest">Sellbit</span>
         </div>
       </div>
 

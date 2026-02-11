@@ -8,20 +8,27 @@ import DepositPage from './pages/DepositPage';
 import WithdrawPage from './pages/WithdrawPage';
 import ExchangePage from './pages/ExchangePage';
 import ProfilePage from './pages/ProfilePage';
+import KycPage from './pages/KycPage';
 import { PageView, Asset, Deal, DealStatus } from './types';
 import { MOCK_ASSETS } from './constants';
 import { Haptic } from './utils/haptics';
 import { useUser } from './context/UserContext';
+import { usePin } from './context/PinContext';
 import { supabase } from './lib/supabase';
 import { tradeRowToDeal, dealToTradeInsert } from './lib/trades';
 import { useToast } from './context/ToastContext';
+import CreatePinScreen from './components/CreatePinScreen';
+import OnboardingScreen from './components/OnboardingScreen';
 
 const App: React.FC = () => {
   const { user, tgid, loading, error, refreshUser } = useUser();
+  const { hasPin, requirePin } = usePin();
   const toast = useToast();
   const [currentPage, setCurrentPage] = useState<PageView>('HOME');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [onboardingDone, setOnboardingDone] = useState(false);
+  const [pinCreated, setPinCreated] = useState(false);
   const userLuckRef = useRef<'win' | 'lose' | 'default'>(user?.luck ?? 'default');
   const paidDealIds = useRef<Set<string>>(new Set());
   userLuckRef.current = user?.luck ?? 'default';
@@ -232,6 +239,19 @@ const App: React.FC = () => {
     );
   }
 
+  // Первый вход: онбординг (шаг 1) → создание пароля (шаг 2) → в приложение
+  if (tgid && user && !hasPin(tgid) && !pinCreated) {
+    if (!onboardingDone) {
+      return <OnboardingScreen onNext={() => setOnboardingDone(true)} />;
+    }
+    return (
+      <CreatePinScreen
+        tgid={tgid}
+        onCreated={() => setPinCreated(true)}
+      />
+    );
+  }
+
   const renderContent = () => {
     switch (currentPage) {
       case 'HOME':
@@ -265,7 +285,15 @@ const App: React.FC = () => {
       case 'EXCHANGE':
         return <ExchangePage balance={balance} onExchange={handleExchange} onBack={() => handleNavigate('HOME')} />;
       case 'PROFILE':
-        return <ProfilePage deals={deals} onBack={() => handleNavigate('HOME')} />;
+        return (
+          <ProfilePage
+            deals={deals}
+            onBack={() => handleNavigate('HOME')}
+            onNavigateToKyc={() => setCurrentPage('KYC')}
+          />
+        );
+      case 'KYC':
+        return <KycPage onBack={() => setCurrentPage('PROFILE')} />;
       default:
         return (
           <HomePage

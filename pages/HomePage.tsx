@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import HomeHeader from '../components/HomeHeader';
 import BalanceDisplay from '../components/BalanceDisplay';
 import QuickActions from '../components/QuickActions';
+import MarketTicker from '../components/MarketTicker';
 import AssetTable from '../components/AssetTable';
 import { MOCK_ASSETS } from '../constants';
 import { Asset, PageView } from '../types';
@@ -59,9 +60,21 @@ const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading,
       </div>
 
       <QuickActions onNavigate={onNavigate} />
+
+      {/* Полоска как на бирже: объём 24ч + статус */}
+      <div className="px-4 mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+        <span className="flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+          Все системы работают
+        </span>
+        <span className="font-mono">24ч объём: 12.4 млрд ₽</span>
+      </div>
+
+      <div className="px-4 mt-3">
+        <MarketTicker />
+      </div>
       
-      <div className="mt-2 flex-1 px-4">
-        {/* Removed margin-bottom here to let sticky work smoothly */}
+      <div className="mt-4 flex-1 px-4 pb-28">
         <AssetTable assets={liveAssets} onAssetClick={onNavigateToTrading} />
       </div>
     </div>

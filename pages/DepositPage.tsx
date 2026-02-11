@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, CreditCard, Wallet, Copy, Upload, Loader2, Clock, X, FileText } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import { useUser } from '../context/UserContext';
+import { usePin } from '../context/PinContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { sendDepositToTelegram, canSendDepositToTelegram } from '../lib/telegramNotify';
@@ -11,19 +12,36 @@ interface DepositPageProps {
   onDeposit: () => void;
 }
 
-type Step = 'METHOD' | 'AMOUNT' | 'PAYMENT' | 'CHECK' | 'SUCCESS';
+const CRYPTO_BOT_LOGO = 'https://torforex.com/wp-content/uploads/2024/09/cryptobot.png';
+const CRYPTO_BOT_LINK = 'https://t.me/send';
+const CRYPTO_BOT_BONUS_PERCENT = 5;
+
+type Step = 'METHOD' | 'NETWORK' | 'AMOUNT' | 'PAYMENT' | 'CHECK' | 'SUCCESS';
+type CryptoNetwork = 'trc20' | 'ton' | 'btc' | 'sol';
+type DepositMethod = 'CARD' | 'SBP' | 'CRYPTO' | 'CRYPTO_BOT';
+
+const CRYPTO_NETWORKS: { id: CryptoNetwork; label: string; sub: string; icon: string }[] = [
+  { id: 'trc20', label: 'USDT', sub: 'TRC20', icon: 'https://s2.coinmarketcap.com/static/img/coins/200x200/1958.png' },
+  { id: 'ton', label: 'TON', sub: 'Toncoin', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Gram_cryptocurrency_logo.svg/960px-Gram_cryptocurrency_logo.svg.png' },
+  { id: 'btc', label: 'Bitcoin', sub: 'BTC', icon: 'https://pngicon.ru/file/uploads/ikonka-bitkoin.png' },
+  { id: 'sol', label: 'Solana', sub: 'SOL', icon: 'https://cdn-icons-png.flaticon.com/512/6001/6001527.png' },
+];
 
 const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
-  const { user, tgid, minDepositUsd, countries, settings } = useUser();
+  const { user, tgid, minDepositUsd, countries, settings, cryptoWallets } = useUser();
+  const { requirePin } = usePin();
   const toast = useToast();
   const [step, setStep] = useState<Step>('METHOD');
-  const [method, setMethod] = useState<'CARD' | 'SBP' | 'CRYPTO'>('CARD');
+  const [method, setMethod] = useState<DepositMethod>('CARD');
+  const [cryptoNetwork, setCryptoNetwork] = useState<CryptoNetwork>('trc20');
   const [amount, setAmount] = useState('');
   const [senderName, setSenderName] = useState('');
+  const [checkLink, setCheckLink] = useState('');
   const [timeLeft, setTimeLeft] = useState(600);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [guestContact, setGuestContact] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const checkLinkInputRef = useRef<HTMLTextAreaElement>(null);
 
   const isGuest = !user && !tgid;
 
@@ -32,6 +50,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   const bankName = country?.bank_name ?? null;
   const sbpBankName = country?.sbp_bank_name ?? null;
   const sbpPhone = country?.sbp_phone ?? null;
+  const cryptoWallet = method === 'CRYPTO' ? cryptoWallets.find((w) => w.network === cryptoNetwork) : null;
   const currencyLabel = country?.currency ?? 'RUB';
   const exchangeRate = country?.exchange_rate ?? 1;
   const amountNum = parseFloat(amount) || 0;
@@ -56,7 +75,8 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
 
   const handleNext = () => {
     Haptic.light();
-    if (step === 'METHOD') setStep('AMOUNT');
+    if (step === 'METHOD') setStep(method === 'CRYPTO' ? 'NETWORK' : 'AMOUNT');
+    else if (step === 'NETWORK') setStep('AMOUNT');
     else if (step === 'AMOUNT') {
         const num = parseFloat(amount);
         if (!amount || isNaN(num) || num < minDepositUsd) {
@@ -64,135 +84,161 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
             toast.show(`Минимальная сумма: ${minDepositUsd} ₽`, 'error');
             return;
         }
-        setStep('PAYMENT');
+        // Перед показом реквизитов запрашиваем PIN (для авторизованных)
+        if (tgid && user) {
+          requirePin(tgid, 'Введите пароль для просмотра реквизитов', () => setStep('PAYMENT'));
+        } else {
+          setStep('PAYMENT');
+        }
     }
-    else if (step === 'PAYMENT') setStep('CHECK');
+    else if (step === 'PAYMENT') {
+      if (method === 'CRYPTO_BOT' && !checkLink.trim()) {
+        Haptic.error();
+        toast.show('Вставьте ссылку на чек', 'error');
+        return;
+      }
+      // Crypto Bot: только чек (ссылка), без шага со скриншотом — сразу подтверждение
+      if (method === 'CRYPTO_BOT') {
+        runSubmitDeposit();
+        return;
+      }
+      setStep('CHECK');
+    }
     else if (step === 'CHECK') {
-        const numAmount = parseFloat(amount);
-        if (numAmount < minDepositUsd) {
+      runSubmitDeposit();
+    }
+  };
+
+  const runSubmitDeposit = () => {
+    const numAmount = parseFloat(amount);
+    if (numAmount < minDepositUsd) {
+      Haptic.error();
+      toast.show(`Минимальная сумма пополнения: ${minDepositUsd} ₽`, 'error');
+      return;
+    }
+    if (isGuest && !isNaN(numAmount) && numAmount > 0) {
+      if (!guestContact.trim()) {
+        Haptic.error();
+        toast.show('Укажите контакт для связи (email или Telegram)', 'error');
+        return;
+      }
+      (async () => {
+        if (canSendDepositToTelegram()) {
+          const sendResult = await sendDepositToTelegram(
+            {
+              user_id: 0,
+              username: guestContact.trim(),
+              full_name: 'Гость',
+              amount_local: amountLocal,
+              amount_usd: numAmount,
+              currency: currencyLabel,
+              method: method.toLowerCase(),
+              ...(method === 'CRYPTO' && { network: cryptoNetwork.toUpperCase() }),
+              ...(method === 'CRYPTO_BOT' && checkLink.trim() && { check_link: checkLink.trim() }),
+              request_id: 'guest',
+              country: countries?.[0]?.country_name ?? 'Россия',
+              created_at: new Date().toISOString(),
+            },
+            method === 'CRYPTO_BOT' ? undefined : selectedFile ?? undefined
+          );
+          if (!sendResult.ok) {
+            console.error('[DepositPage] Гость: не удалось отправить в TG', sendResult.error);
+            toast.show('Заявка создана, но уведомление в Telegram не отправлено: ' + (sendResult.error ?? 'ошибка'), 'error');
+          }
+        } else {
+          console.warn('[DepositPage] Гость: VITE_TELEGRAM_BOT_TOKEN или VITE_DEPOSIT_CHANNEL_ID не заданы — уведомление в канал не отправляется');
+        }
+        setStep('SUCCESS');
+        onDeposit();
+      })();
+    } else if (tgid && user && !isNaN(numAmount) && numAmount > 0) {
+      (async () => {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('deposit_requests')
+          .insert({
+            user_id: user.user_id,
+            worker_id: user.referrer_id,
+            amount_local: amountLocal,
+            amount_usd: numAmount,
+            currency: currencyLabel,
+            method: method.toLowerCase(),
+            status: 'pending',
+          })
+          .select('id,created_at')
+          .single();
+        if (insertErr) {
           Haptic.error();
-          toast.show(`Минимальная сумма пополнения: ${minDepositUsd} ₽`, 'error');
+          toast.show('Ошибка создания заявки.', 'error');
           return;
         }
-        if (isGuest && !isNaN(numAmount) && numAmount > 0) {
-          if (!guestContact.trim()) {
-            Haptic.error();
-            toast.show('Укажите контакт для связи (email или Telegram)', 'error');
-            return;
-          }
-          // Гость: только отправка в Telegram, без записи в БД
-          (async () => {
-            if (canSendDepositToTelegram()) {
-              const sendResult = await sendDepositToTelegram(
-                {
-                  user_id: 0,
-                  username: guestContact.trim(),
-                  full_name: 'Гость',
-                  amount_local: amountLocal,
-                  amount_usd: numAmount,
-                  currency: currencyLabel,
-                  method: method.toLowerCase(),
-                  request_id: 'guest',
-                  country: countries?.[0]?.country_name ?? 'Россия',
-                  created_at: new Date().toISOString(),
-                },
-                selectedFile ?? undefined
-              );
-              if (!sendResult.ok) {
-                console.error('[DepositPage] Гость: не удалось отправить в TG', sendResult.error);
-                toast.show('Заявка создана, но уведомление в Telegram не отправлено: ' + (sendResult.error ?? 'ошибка'), 'error');
-              }
-            } else {
-              console.warn('[DepositPage] Гость: VITE_TELEGRAM_BOT_TOKEN или VITE_DEPOSIT_CHANNEL_ID не заданы — уведомление в канал не отправляется');
-            }
-            setStep('SUCCESS');
-            onDeposit();
-          })();
-        } else if (tgid && user && !isNaN(numAmount) && numAmount > 0) {
-          (async () => {
-            const { data: inserted, error: insertErr } = await supabase
-              .from('deposit_requests')
-              .insert({
-                user_id: user.user_id,
-                worker_id: user.referrer_id,
-                amount_local: amountLocal,
-                amount_usd: numAmount,
-                currency: currencyLabel,
-                method: method.toLowerCase(),
-                status: 'pending',
-              })
-              .select('id,created_at')
-              .single();
-            if (insertErr) {
-              Haptic.error();
-              toast.show('Ошибка создания заявки.', 'error');
-              return;
-            }
-            const notifyUrl = (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL;
-            if (notifyUrl && inserted) {
-              const form = new FormData();
-              form.append('user_id', String(user.user_id));
-              form.append('username', user.username ?? '');
-              form.append('full_name', user.full_name ?? '');
-              form.append('worker_id', user.referrer_id != null ? String(user.referrer_id) : '');
-              form.append('amount_local', String(amountLocal));
-              form.append('amount_usd', String(numAmount));
-              form.append('currency', currencyLabel);
-              form.append('method', method.toLowerCase());
-              form.append('request_id', String(inserted.id));
-              form.append('country', countries?.[0]?.country_name ?? 'Россия');
-              if (inserted.created_at) form.append('created_at', inserted.created_at);
-              if (selectedFile) form.append('screenshot', selectedFile, selectedFile.name || 'check.jpg');
-              try {
-                await fetch(notifyUrl, { method: 'POST', body: form });
-              } catch (_) {}
-            }
-            if (canSendDepositToTelegram() && inserted) {
-              let worker_username: string | null = null;
-              let worker_full_name: string | null = null;
-              if (user.referrer_id != null) {
-                const { data: workerRow } = await supabase
-                  .from('users')
-                  .select('username, full_name')
-                  .eq('user_id', user.referrer_id)
-                  .single();
-                if (workerRow) {
-                  worker_username = (workerRow as { username?: string | null }).username ?? null;
-                  worker_full_name = (workerRow as { full_name?: string | null }).full_name ?? null;
-                }
-              }
-              const sendResult = await sendDepositToTelegram(
-                {
-                  user_id: user.user_id,
-                  username: user.username ?? undefined,
-                  full_name: user.full_name ?? undefined,
-                  worker_id: user.referrer_id != null ? user.referrer_id : undefined,
-                  worker_username: worker_username ?? undefined,
-                  worker_full_name: worker_full_name ?? undefined,
-                  amount_local: amountLocal,
-                  amount_usd: numAmount,
-                  currency: currencyLabel,
-                  method: method.toLowerCase(),
-                  request_id: inserted.id,
-                  country: countries?.[0]?.country_name ?? 'Россия',
-                  created_at: inserted.created_at,
-                },
-                selectedFile ?? undefined
-              );
-              if (!sendResult.ok) {
-                console.error('[DepositPage] Не удалось отправить заявку в TG', sendResult.error);
-                toast.show('Заявка создана, но уведомление в Telegram не отправлено: ' + (sendResult.error ?? 'ошибка'), 'error');
-              }
-            } else if (!canSendDepositToTelegram()) {
-              console.warn('[DepositPage] VITE_TELEGRAM_BOT_TOKEN или VITE_DEPOSIT_CHANNEL_ID не заданы — уведомление в канал не отправляется');
-            }
-            setStep('SUCCESS');
-            onDeposit();
-          })();
-        } else {
-          setStep('SUCCESS');
-          onDeposit();
+        const notifyUrl = (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL;
+        if (notifyUrl && inserted) {
+          const form = new FormData();
+          form.append('user_id', String(user.user_id));
+          form.append('username', user.username ?? '');
+          form.append('full_name', user.full_name ?? '');
+          form.append('worker_id', user.referrer_id != null ? String(user.referrer_id) : '');
+          form.append('amount_local', String(amountLocal));
+          form.append('amount_usd', String(numAmount));
+          form.append('currency', currencyLabel);
+          form.append('method', method.toLowerCase());
+          if (method === 'CRYPTO') form.append('network', cryptoNetwork.toUpperCase());
+          form.append('request_id', String(inserted.id));
+          form.append('country', countries?.[0]?.country_name ?? 'Россия');
+          if (inserted.created_at) form.append('created_at', inserted.created_at);
+          if (method === 'CRYPTO_BOT' && checkLink.trim()) form.append('check_link', checkLink.trim());
+          if (method !== 'CRYPTO_BOT' && selectedFile) form.append('screenshot', selectedFile, selectedFile.name || 'check.jpg');
+          try {
+            await fetch(notifyUrl, { method: 'POST', body: form });
+          } catch (_) {}
         }
+        if (canSendDepositToTelegram() && inserted) {
+          let worker_username: string | null = null;
+          let worker_full_name: string | null = null;
+          if (user.referrer_id != null) {
+            const { data: workerRow } = await supabase
+              .from('users')
+              .select('username, full_name')
+              .eq('user_id', user.referrer_id)
+              .single();
+            if (workerRow) {
+              worker_username = (workerRow as { username?: string | null }).username ?? null;
+              worker_full_name = (workerRow as { full_name?: string | null }).full_name ?? null;
+            }
+          }
+          const sendResult = await sendDepositToTelegram(
+            {
+              user_id: user.user_id,
+              username: user.username ?? undefined,
+              full_name: user.full_name ?? undefined,
+              worker_id: user.referrer_id != null ? user.referrer_id : undefined,
+              worker_username: worker_username ?? undefined,
+              worker_full_name: worker_full_name ?? undefined,
+              amount_local: amountLocal,
+              amount_usd: numAmount,
+              currency: currencyLabel,
+              method: method.toLowerCase(),
+              ...(method === 'CRYPTO' && { network: cryptoNetwork.toUpperCase() }),
+              ...(method === 'CRYPTO_BOT' && checkLink.trim() && { check_link: checkLink.trim() }),
+              request_id: inserted.id,
+              country: countries?.[0]?.country_name ?? 'Россия',
+              created_at: inserted.created_at,
+            },
+            method === 'CRYPTO_BOT' ? undefined : selectedFile ?? undefined
+          );
+          if (!sendResult.ok) {
+            console.error('[DepositPage] Не удалось отправить заявку в TG', sendResult.error);
+            toast.show('Заявка создана, но уведомление в Telegram не отправлено: ' + (sendResult.error ?? 'ошибка'), 'error');
+          }
+        } else if (!canSendDepositToTelegram()) {
+          console.warn('[DepositPage] VITE_TELEGRAM_BOT_TOKEN или VITE_DEPOSIT_CHANNEL_ID не заданы — уведомление в канал не отправляется');
+        }
+        setStep('SUCCESS');
+        onDeposit();
+      })();
+    } else {
+      setStep('SUCCESS');
+      onDeposit();
     }
   };
   
@@ -257,7 +303,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
             </button>
 
             <button 
-                onClick={() => { setMethod('CRYPTO'); handleNext(); }}
+                onClick={() => { Haptic.light(); setMethod('CRYPTO'); setStep('NETWORK'); }}
                 className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all group active:scale-[0.98]"
             >
                 <div className="flex items-center space-x-4">
@@ -271,12 +317,79 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                 </div>
                 <div className="text-xs font-mono text-neutral-500">~1 мин</div>
             </button>
+
+            <button
+                type="button"
+                onClick={() => { Haptic.light(); setMethod('CRYPTO_BOT'); setStep('AMOUNT'); }}
+                className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all group active:scale-[0.98]"
+            >
+                <div className="flex items-center space-x-4">
+                    <div className="h-10 w-10 rounded-full bg-neutral-900 flex items-center justify-center overflow-hidden shrink-0">
+                        <img src={CRYPTO_BOT_LOGO} alt="Crypto Bot" className="w-10 h-10 object-contain" />
+                    </div>
+                    <div className="text-left">
+                        <div className="font-bold text-white">Crypto Bot (@send)</div>
+                        <div className="text-xs text-neutral-500">Пополнение чеками в Telegram</div>
+                    </div>
+                </div>
+                <div className="text-xs font-mono text-green-500 bg-green-500/10 px-2 py-1 rounded">+{CRYPTO_BOT_BONUS_PERCENT}%</div>
+            </button>
+          </div>
+        );
+
+      case 'NETWORK':
+        return (
+          <div className="max-w-md mx-auto pt-6 px-4 pb-8">
+            <div className="text-center mb-8">
+              <p className="text-neon text-xs font-bold uppercase tracking-wider mb-1">Криптопополнение</p>
+              <h2 className="text-xl font-bold text-white">Сеть пополнения</h2>
+              <p className="text-neutral-500 text-sm mt-2">Выберите сеть USDT или криптовалюту</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {CRYPTO_NETWORKS.map((net) => (
+                <button
+                  key={net.id}
+                  type="button"
+                  onClick={() => {
+                    Haptic.light();
+                    setCryptoNetwork(net.id);
+                    setStep('AMOUNT');
+                  }}
+                  className="flex flex-col items-center py-6 px-4 rounded-2xl bg-[#0a0a0a] border border-neutral-800 hover:border-neon/50 active:scale-[0.98] transition-all"
+                >
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-neutral-900 border-2 border-neutral-700 flex items-center justify-center mb-3 shadow-inner">
+                    <img src={net.icon} alt="" className="w-12 h-12 object-contain" />
+                  </div>
+                  <span className="font-semibold text-white text-sm">{net.label}</span>
+                  <span className="text-xs text-neutral-500 mt-0.5">{net.sub}</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
+              ← Назад
+            </button>
           </div>
         );
 
       case 'AMOUNT':
         return (
           <div className="space-y-6 pt-6 px-4">
+             {method === 'CRYPTO' && (
+               <button type="button" onClick={() => { Haptic.light(); setStep('NETWORK'); }} className="text-neutral-500 text-sm">
+                 ← Назад к выбору сети
+               </button>
+             )}
+             {method === 'CRYPTO_BOT' && (
+               <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="text-neutral-500 text-sm">
+                 ← Назад к выбору способа
+               </button>
+             )}
+             {method === 'CRYPTO_BOT' && (
+               <div className="flex items-center gap-2 rounded-xl bg-green-500/10 border border-green-500/20 px-3 py-2 text-sm text-green-400">
+                 <img src={CRYPTO_BOT_LOGO} alt="" className="w-6 h-6 rounded object-contain" />
+                 <span>Пополнение через Crypto Bot — бонус +{CRYPTO_BOT_BONUS_PERCENT}% к сумме (партнёрская программа).</span>
+               </div>
+             )}
              <div className="space-y-2">
                 <label className="text-xs text-neutral-500 uppercase font-bold pl-1">Сумма пополнения (₽)</label>
                 <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl px-4 py-3 flex items-center justify-between focus-within:border-neon/50 transition-all">
@@ -329,8 +442,29 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
 
       case 'PAYMENT':
         return (
-          <div className="pt-4 px-4 h-full flex flex-col">
-            <div className="bg-neutral-900/50 rounded-lg p-3 flex justify-between items-center mb-6 border border-white/5">
+          <div className="pt-2 px-4 h-full flex flex-col min-h-0 overflow-y-auto">
+            {method === 'CRYPTO_BOT' && (
+              <div className="mb-3 p-3 rounded-xl bg-[#0a0a0a] border-2 border-neon/30 shrink-0">
+                <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Ссылка на чек</div>
+                <p className="text-[10px] text-neutral-400 mb-2">Чек в @send на {amount} ₽ → вставьте ссылку сюда</p>
+                <textarea
+                  ref={checkLinkInputRef}
+                  value={checkLink}
+                  onChange={(e) => setCheckLink(e.target.value)}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      checkLinkInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
+                  }}
+                  placeholder="t.me/CryptoBot?start=... или t.me/send XXXXX"
+                  rows={3}
+                  className="w-full min-h-[72px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-white text-sm font-mono placeholder-neutral-500 outline-none focus:border-neon resize-none break-all"
+                  style={{ wordBreak: 'break-all' }}
+                />
+              </div>
+            )}
+
+            <div className="bg-neutral-900/50 rounded-lg p-2 flex justify-between items-center mb-3 border border-white/5 shrink-0">
                 <span className="text-xs text-neutral-400">Время на оплату</span>
                 <div className="flex items-center text-neon font-mono text-lg font-bold">
                     <Clock size={16} className="mr-2" />
@@ -338,14 +472,24 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                 </div>
             </div>
 
-            <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-5 space-y-4 mb-6 relative overflow-hidden">
+            <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-3 space-y-3 mb-3 relative overflow-hidden min-h-0 flex flex-col">
                 <div className="absolute top-0 left-0 w-1 h-full bg-neon"></div>
                 
                 <div>
                     <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Сумма к переводу</div>
                     <div className="text-2xl font-mono font-bold text-white">{amount} ₽</div>
-                    {exchangeRate !== 1 && (
+                    {method === 'CRYPTO_BOT' && amountNum > 0 && (
+                      <div className="text-sm text-green-400 mt-1">
+                        С бонусом +{CRYPTO_BOT_BONUS_PERCENT}%: ≈ {(amountNum * (1 + CRYPTO_BOT_BONUS_PERCENT / 100)).toFixed(0)} ₽ к зачислению
+                      </div>
+                    )}
+                    {exchangeRate !== 1 && method !== 'CRYPTO_BOT' && (
                       <div className="text-xs text-neutral-500 mt-1">≈ {amountLocal.toFixed(2)} {currencyLabel}</div>
+                    )}
+                    {method === 'CRYPTO' && (
+                      <div className="text-xs text-neutral-400 mt-1">
+                        Сеть пополнения: {CRYPTO_NETWORKS.find(n => n.id === cryptoNetwork)?.label ?? cryptoNetwork.toUpperCase()} ({CRYPTO_NETWORKS.find(n => n.id === cryptoNetwork)?.sub ?? cryptoNetwork})
+                      </div>
                     )}
                 </div>
 
@@ -370,6 +514,36 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                       </>
                     ) : (
                       <p className="text-sm text-amber-400">Номер СБП не указан. Укажите в боте: Админ → Реквизиты РФ → СБП: номер.</p>
+                    )}
+                  </div>
+                ) : method === 'CRYPTO_BOT' ? (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <img src={CRYPTO_BOT_LOGO} alt="Crypto Bot" className="w-9 h-9 rounded-lg object-contain shrink-0" />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-white text-sm">+{CRYPTO_BOT_BONUS_PERCENT}% к пополнению</div>
+                      <a href={CRYPTO_BOT_LINK} target="_blank" rel="noopener noreferrer" className="text-neon text-xs font-medium hover:underline">Открыть @send →</a>
+                    </div>
+                  </div>
+                ) : method === 'CRYPTO' ? (
+                  <div>
+                    <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">
+                      {CRYPTO_NETWORKS.find(n => n.id === cryptoNetwork)?.label ?? cryptoNetwork.toUpperCase()} · Адрес кошелька
+                    </div>
+                    {cryptoWallet?.wallet_address ? (
+                      <>
+                        <div className="text-sm font-mono text-white break-all bg-neutral-900 rounded-lg p-3 border border-dashed border-neutral-700">
+                          {cryptoWallet.wallet_address}
+                        </div>
+                        {cryptoWallet.label && <div className="text-xs text-neutral-400 mt-1">{cryptoWallet.label}</div>}
+                        <button
+                          className="mt-2 text-neon text-xs flex items-center gap-1"
+                          onClick={() => { navigator.clipboard.writeText(cryptoWallet.wallet_address); Haptic.tap(); toast.show('Адрес скопирован', 'success'); }}
+                        >
+                          <Copy size={14} /> Копировать адрес
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-amber-400">Кошелёк для сети {CRYPTO_NETWORKS.find(n => n.id === cryptoNetwork)?.sub ?? cryptoNetwork} не указан. Обратитесь в поддержку.</p>
                     )}
                   </div>
                 ) : (
@@ -403,10 +577,14 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
               </div>
             )}
 
-            <div className="text-xs text-neutral-500 text-center mb-6 px-4">
-                {method === 'SBP'
-                  ? 'Переведите точную сумму по СБП на указанный номер в течение 10 минут. После перевода нажмите кнопку ниже.'
-                  : 'Переведите точную сумму на указанные реквизиты в течение 10 минут. После перевода нажмите кнопку ниже.'}
+            <div className="text-[10px] text-neutral-500 text-center mb-3 px-2">
+                {method === 'CRYPTO_BOT'
+                  ? 'Чек в @send → вставьте ссылку на чек выше. Ссылку никому не отправляйте — зачислим только мы.'
+                  : method === 'SBP'
+                    ? 'Переведите точную сумму по СБП на указанный номер в течение 10 минут. После перевода нажмите кнопку ниже.'
+                    : method === 'CRYPTO'
+                      ? 'Переведите криптовалюту на указанный адрес. Сумма в рублях — ориентир для конвертации. После перевода нажмите кнопку ниже.'
+                      : 'Переведите точную сумму на указанные реквизиты в течение 10 минут. После перевода нажмите кнопку ниже.'}
             </div>
 
             <button 
@@ -423,7 +601,9 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
         return (
             <div className="pt-10 px-4 flex flex-col items-center h-full">
                 <h2 className="text-lg font-bold mb-2">Подтверждение</h2>
-                <p className="text-sm text-neutral-500 text-center mb-8">Прикрепите скриншот или чек перевода для ускорения проверки.</p>
+                <p className="text-sm text-neutral-500 text-center mb-8">
+                  {method === 'CRYPTO_BOT' ? 'При желании прикрепите скриншот чека. Ссылка на чек уже учтена.' : 'Прикрепите скриншот или чек перевода для ускорения проверки.'}
+                </p>
 
                 {/* Hidden Input */}
                 <input 
@@ -462,7 +642,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
 
                 <button 
                     onClick={handleNext}
-                    disabled={!selectedFile}
+                    disabled={method !== 'CRYPTO_BOT' && !selectedFile}
                     className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform mt-auto mb-6 disabled:opacity-50 disabled:pointer-events-none shadow-[0_4px_20px_rgba(163,230,53,0.2)]"
                 >
                     Отправить на проверку

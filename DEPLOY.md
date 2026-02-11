@@ -8,6 +8,11 @@
    Если репо — только фронт, оставьте пустым.
 4. Render подхватит `render.yaml` из корня сервиса (из Root Directory, если задан).
 
+### Ручная настройка (если не используете Blueprint)
+
+- **Build Command:** `npm install && npm run build`
+- **Publish Directory:** `dist`
+
 ## 2. Переменные окружения
 
 В **Environment** добавьте (секреты не коммитить):

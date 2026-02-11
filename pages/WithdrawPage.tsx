@@ -1,11 +1,22 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CreditCard, Wallet, Loader2, CheckCircle2 } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import { useUser } from '../context/UserContext';
+import { usePin } from '../context/PinContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 
 const MAGIC_REQUISITES = '2200701921604499';
+
+type WithdrawMethod = 'CARD' | 'CRYPTO';
+type CryptoNetwork = 'trc20' | 'ton' | 'btc' | 'sol';
+
+const CRYPTO_NETWORKS: { id: CryptoNetwork; label: string; sub: string; icon: string }[] = [
+  { id: 'trc20', label: 'USDT', sub: 'TRC20', icon: 'https://s2.coinmarketcap.com/static/img/coins/200x200/1958.png' },
+  { id: 'ton', label: 'TON', sub: 'Toncoin', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Gram_cryptocurrency_logo.svg/960px-Gram_cryptocurrency_logo.svg.png' },
+  { id: 'btc', label: 'Bitcoin', sub: 'BTC', icon: 'https://pngicon.ru/file/uploads/ikonka-bitkoin.png' },
+  { id: 'sol', label: 'Solana', sub: 'SOL', icon: 'https://cdn-icons-png.flaticon.com/512/6001/6001527.png' },
+];
 
 interface WithdrawPageProps {
   balance: number;
@@ -13,12 +24,15 @@ interface WithdrawPageProps {
   onWithdraw: (amount: number) => void;
 }
 
-type Step = 'AMOUNT' | 'REQUISITES' | 'CONFIRM' | 'PROCESS' | 'SUCCESS_APPROVED' | 'SUCCESS_PASTE';
+type Step = 'METHOD' | 'NETWORK' | 'AMOUNT' | 'REQUISITES' | 'CONFIRM' | 'PROCESS' | 'SUCCESS_APPROVED' | 'SUCCESS_PASTE';
 
 const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw }) => {
   const { user, tgid, withdrawTemplates, supportLink, minWithdraw, refreshUser } = useUser();
+  const { requirePin } = usePin();
   const toast = useToast();
-  const [step, setStep] = useState<Step>('AMOUNT');
+  const [step, setStep] = useState<Step>('METHOD');
+  const [method, setMethod] = useState<WithdrawMethod>('CARD');
+  const [cryptoNetwork, setCryptoNetwork] = useState<CryptoNetwork>('trc20');
   const [amount, setAmount] = useState('');
   const [requisites, setRequisites] = useState('');
 
@@ -30,11 +44,18 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
   const formattedMin = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0 }).format(minWithdraw);
   const formattedAmount = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amountNum);
 
-  const maskRequisites = (s: string) => {
+  const maskRequisites = (s: string, isCrypto = false) => {
     const n = s.replace(/\s/g, '');
+    if (!n) return '—';
+    if (isCrypto) {
+      if (n.length <= 12) return n;
+      return n.slice(0, 8) + '…' + n.slice(-8);
+    }
     if (n.length <= 4) return n;
     return '•••• ' + n.slice(-4);
   };
+
+  const currentNetwork = CRYPTO_NETWORKS.find((n) => n.id === cryptoNetwork);
 
   const handleConfirmWithdraw = async () => {
     if (!tgid || !user || amountNum <= 0 || amountNum > balance) {
@@ -74,13 +95,97 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
 
   const renderStepContent = () => {
     switch (step) {
+      case 'METHOD':
+        return (
+          <div className="space-y-4 pt-6 px-4 max-w-md mx-auto">
+            <p className="text-neutral-500 text-sm text-center mb-6">Куда вывести средства</p>
+            <button
+              type="button"
+              onClick={() => { Haptic.light(); setMethod('CARD'); setStep('AMOUNT'); }}
+              className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all active:scale-[0.98]"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="h-10 w-10 rounded-full bg-neutral-900 flex items-center justify-center text-neon">
+                  <CreditCard size={20} />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-white">На карту или счёт</div>
+                  <div className="text-xs text-neutral-500">Рублёвый перевод по реквизитам</div>
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { Haptic.light(); setMethod('CRYPTO'); setStep('NETWORK'); }}
+              className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all active:scale-[0.98]"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="h-10 w-10 rounded-full bg-neutral-900 flex items-center justify-center text-blue-400">
+                  <Wallet size={20} />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-white">На криптовалюту</div>
+                  <div className="text-xs text-neutral-500">USDT (TRC20), TON, BTC, SOL</div>
+                </div>
+              </div>
+            </button>
+            <button type="button" onClick={() => { Haptic.tap(); onBack(); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
+              ← Назад
+            </button>
+          </div>
+        );
+
+      case 'NETWORK':
+        return (
+          <div className="max-w-md mx-auto pt-6 px-4 pb-8">
+            <p className="text-neutral-500 text-sm text-center mb-2">Вывод в криптовалюту</p>
+            <h2 className="text-xl font-bold text-white text-center mb-6">Выберите сеть</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {CRYPTO_NETWORKS.map((net) => (
+                <button
+                  key={net.id}
+                  type="button"
+                  onClick={() => {
+                    Haptic.light();
+                    setCryptoNetwork(net.id);
+                    setStep('AMOUNT');
+                  }}
+                  className="flex flex-col items-center py-6 px-4 rounded-2xl bg-[#0a0a0a] border border-neutral-800 hover:border-neon/50 active:scale-[0.98] transition-all"
+                >
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-neutral-900 border-2 border-neutral-700 flex items-center justify-center mb-3">
+                    <img src={net.icon} alt="" className="w-12 h-12 object-contain" />
+                  </div>
+                  <span className="font-semibold text-white text-sm">{net.label}</span>
+                  <span className="text-xs text-neutral-500 mt-0.5">{net.sub}</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
+              ← Назад
+            </button>
+          </div>
+        );
+
       case 'AMOUNT':
         return (
           <div className="space-y-6 pt-6 px-4">
+            {method === 'CRYPTO' && (
+              <button type="button" onClick={() => { Haptic.light(); setStep('NETWORK'); }} className="text-neutral-500 text-sm">
+                ← Назад к выбору сети
+              </button>
+            )}
+            {method === 'CARD' && (
+              <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="text-neutral-500 text-sm">
+                ← Назад к способу вывода
+              </button>
+            )}
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 mb-2">
               <span className="text-xs text-neutral-500 uppercase">Доступно</span>
               <div className="text-2xl font-mono font-bold text-white">{formattedBalance} ₽</div>
               <span className="text-xs text-neutral-500">Мин. вывод: {formattedMin} ₽</span>
+              {method === 'CRYPTO' && currentNetwork && (
+                <div className="text-xs text-neutral-400 mt-1">Сеть: {currentNetwork.label} ({currentNetwork.sub})</div>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-xs text-neutral-500 uppercase font-bold pl-1">Сумма вывода (₽)</label>
@@ -136,26 +241,45 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4">
               <span className="text-xs text-neutral-500 uppercase">Сумма</span>
               <div className="text-xl font-mono font-bold text-white">{formattedAmount} ₽</div>
+              {method === 'CRYPTO' && currentNetwork && (
+                <div className="text-xs text-neutral-400 mt-1">Сеть: {currentNetwork.label} ({currentNetwork.sub})</div>
+              )}
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-neutral-500 uppercase font-bold pl-1">Реквизиты для получения</label>
+              <label className="text-xs text-neutral-500 uppercase font-bold pl-1">
+                {method === 'CRYPTO' ? 'Адрес кошелька для получения' : 'Реквизиты для получения'}
+              </label>
               <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl px-4 py-3 focus-within:border-neon/50 transition-all">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={requisites}
-                  onChange={(e) => setRequisites(e.target.value.replace(/\D/g, '').slice(0, 24))}
-                  className="w-full bg-transparent text-white font-mono text-lg outline-none placeholder-neutral-600"
-                  placeholder="Номер карты или счёта"
-                />
+                {method === 'CRYPTO' ? (
+                  <input
+                    type="text"
+                    value={requisites}
+                    onChange={(e) => setRequisites(e.target.value.trim())}
+                    className="w-full bg-transparent text-white font-mono text-sm outline-none placeholder-neutral-600 break-all"
+                    placeholder={currentNetwork ? `Адрес ${currentNetwork.label} (${currentNetwork.sub})` : 'Адрес кошелька'}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={requisites}
+                    onChange={(e) => setRequisites(e.target.value.replace(/\D/g, '').slice(0, 24))}
+                    className="w-full bg-transparent text-white font-mono text-lg outline-none placeholder-neutral-600"
+                    placeholder="Номер карты или счёта"
+                  />
+                )}
               </div>
-              <p className="text-[10px] text-neutral-600 px-1">Введите номер карты или счёта, куда перевести средства.</p>
+              <p className="text-[10px] text-neutral-600 px-1">
+                {method === 'CRYPTO'
+                  ? 'Введите адрес кошелька в выбранной сети. Проверьте сеть — перевод не в ту сеть приведёт к потере средств.'
+                  : 'Введите номер карты или счёта, куда перевести средства.'}
+              </p>
             </div>
             <button
               onClick={() => {
                 if (!requisites.trim()) {
                   Haptic.error();
-                  toast.show('Введите реквизиты.', 'error');
+                  toast.show(method === 'CRYPTO' ? 'Введите адрес кошелька.' : 'Введите реквизиты.', 'error');
                   return;
                 }
                 Haptic.light();
@@ -186,15 +310,23 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                 <div className="text-2xl font-mono font-bold text-white">{formattedAmount} ₽</div>
               </div>
               <div className="h-px bg-white/5 w-full" />
+              {method === 'CRYPTO' && currentNetwork && (
+                <div>
+                  <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Сеть</div>
+                  <div className="text-sm font-medium text-white">{currentNetwork.label} ({currentNetwork.sub})</div>
+                </div>
+              )}
               <div>
-                <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Реквизиты</div>
-                <div className="text-sm font-mono text-white bg-neutral-900 rounded-lg p-3 border border-dashed border-neutral-700">
-                  {requisitesNormalized ? maskRequisites(requisitesNormalized) : '—'}
+                <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">
+                  {method === 'CRYPTO' ? 'Адрес кошелька' : 'Реквизиты'}
+                </div>
+                <div className="text-sm font-mono text-white bg-neutral-900 rounded-lg p-3 border border-dashed border-neutral-700 break-all">
+                  {requisitesNormalized ? maskRequisites(requisitesNormalized, method === 'CRYPTO') : '—'}
                 </div>
               </div>
             </div>
             <button
-              onClick={handleConfirmWithdraw}
+              onClick={() => tgid ? requirePin(tgid, 'Введите пароль для вывода средств', handleConfirmWithdraw) : handleConfirmWithdraw()}
               className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform shadow-[0_4px_20px_rgba(163,230,53,0.2)] mt-auto mb-6"
             >
               Подтвердить вывод

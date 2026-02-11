@@ -81,8 +81,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({ onNavigateToTrading }) => {
             </div>
         </div>
 
-        {/* Content Area */}
-        <div className="px-4 pb-20 pt-2 min-h-screen">
+        {/* Content Area — нижний отступ больше высоты меню, чтобы последние активы не перекрывались */}
+        <div className="px-4 pb-28 pt-2 min-h-screen">
             {filteredAssets.length > 0 ? (
                 <AssetTable 
                     assets={filteredAssets} 

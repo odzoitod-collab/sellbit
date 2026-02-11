@@ -1,16 +1,31 @@
-import React from 'react';
-import { ArrowLeft, Trophy, XCircle, BarChart3, HelpCircle, ChevronRight, ShieldCheck, ShieldAlert } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, Trophy, XCircle, BarChart3, HelpCircle, ChevronRight, ShieldCheck, ShieldAlert, KeyRound, X } from 'lucide-react';
 import { Deal } from '../types';
 import { Haptic } from '../utils/haptics';
 import { useUser } from '../context/UserContext';
+import { usePin } from '../context/PinContext';
+import { checkPin, setPin } from '../utils/pinStorage';
+import PinKeypad from '../components/PinKeypad';
+import { useToast } from '../context/ToastContext';
 
 interface ProfilePageProps {
   deals: Deal[];
   onBack: () => void;
+  onNavigateToKyc?: () => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack }) => {
-  const { user, supportLink } = useUser();
+type ChangePinStep = null | 'current' | 'new' | 'repeat';
+
+const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKyc }) => {
+  const { user, supportLink, tgid } = useUser();
+  const { hasPin } = usePin();
+  const toast = useToast();
+  const [changePinStep, setChangePinStep] = useState<ChangePinStep>(null);
+  const [currentPinValue, setCurrentPinValue] = useState('');
+  const [newPinValue, setNewPinValue] = useState('');
+  const [repeatPinValue, setRepeatPinValue] = useState('');
+  const [pinError, setPinError] = useState('');
+  const newPinRef = React.useRef('');
 
   const finishedDeals = deals.filter((d) => d.status === 'WIN' || d.status === 'LOSS');
   const wins = finishedDeals.filter((d) => d.status === 'WIN').length;
@@ -68,19 +83,30 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack }) => {
               Откройте приложение из Telegram для торговли и вывода средств.
             </p>
           )}
-          {/* Статус верификации из БД (меняется в ТГ-боте: воркер/админ) */}
+          {/* Статус верификации из БД (is_kyc выставляется в ТГ-боте). Кнопка только если не верифицирован. */}
           {!isGuest && (
-            <div className={`mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-xl border ${user?.is_kyc === true ? 'bg-green-500/10 border-green-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
-              {user?.is_kyc === true ? (
-                <>
-                  <ShieldCheck size={18} className="text-green-500 flex-shrink-0" />
-                  <span className="text-sm font-medium text-green-400">Верификация пройдена</span>
-                </>
-              ) : (
-                <>
-                  <ShieldAlert size={18} className="text-amber-500 flex-shrink-0" />
-                  <span className="text-sm font-medium text-amber-400">Верификация не пройдена</span>
-                </>
+            <div className="mt-4 w-full flex flex-col items-center gap-3">
+              <div className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border ${user?.is_kyc === true ? 'bg-green-500/10 border-green-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                {user?.is_kyc === true ? (
+                  <>
+                    <ShieldCheck size={18} className="text-green-500 flex-shrink-0" />
+                    <span className="text-sm font-medium text-green-400">Верификация пройдена</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert size={18} className="text-amber-500 flex-shrink-0" />
+                    <span className="text-sm font-medium text-amber-400">Требуется верификация</span>
+                  </>
+                )}
+              </div>
+              {user?.is_kyc !== true && onNavigateToKyc && (
+                <button
+                  onClick={() => { Haptic.tap(); onNavigateToKyc(); }}
+                  className="w-full py-3.5 px-4 bg-neon text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.98] transition-all shadow-lg shadow-neon/20"
+                >
+                  <ShieldCheck size={20} />
+                  Пройти верификацию
+                </button>
               )}
             </div>
           )}
@@ -115,6 +141,26 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack }) => {
         </div>
 
         <div className="space-y-2 mb-8">
+          {!isGuest && tgid && hasPin(tgid) && (
+            <button
+              type="button"
+              onClick={() => {
+                Haptic.tap();
+                setChangePinStep('current');
+                setCurrentPinValue('');
+                setNewPinValue('');
+                setRepeatPinValue('');
+                setPinError('');
+              }}
+              className="w-full bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 flex items-center justify-between active:scale-[0.98] transition-transform group text-left"
+            >
+              <div className="flex items-center space-x-3">
+                <KeyRound size={20} className="text-neutral-400 group-hover:text-neon" />
+                <span className="text-sm font-medium text-neutral-300 group-hover:text-white">Сменить пароль</span>
+              </div>
+              <ChevronRight size={16} className="text-neutral-600" />
+            </button>
+          )}
           <a
             href={supportLink}
             target="_blank"
@@ -130,6 +176,107 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack }) => {
           </a>
         </div>
       </div>
+
+      {/* Модалка смены пароля */}
+      {changePinStep && tgid && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full bg-[#111] border-t border-white/10 rounded-t-2xl px-6 pt-6 pb-8 max-w-md animate-slide-up">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white">
+                {changePinStep === 'current' && 'Введите текущий пароль'}
+                {changePinStep === 'new' && 'Новый пароль'}
+                {changePinStep === 'repeat' && 'Повторите новый пароль'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  Haptic.tap();
+                  setChangePinStep(null);
+                  setPinError('');
+                }}
+                className="text-neutral-500 hover:text-white p-1"
+                aria-label="Закрыть"
+              >
+                <X size={22} />
+              </button>
+            </div>
+            {changePinStep === 'current' && (
+              <>
+                <PinKeypad
+                  value={currentPinValue}
+                  onChange={setCurrentPinValue}
+                  onSubmit={async (pin) => {
+                    const ok = await checkPin(tgid, pin);
+                    if (ok) {
+                      setPinError('');
+                      setCurrentPinValue('');
+                      setChangePinStep('new');
+                    } else {
+                      Haptic.error();
+                      setPinError('Неверный пароль');
+                      setCurrentPinValue('');
+                    }
+                  }}
+                  error={!!pinError}
+                />
+                {pinError && <p className="text-center text-red-500 text-sm mt-3">{pinError}</p>}
+              </>
+            )}
+            {changePinStep === 'new' && (
+              <>
+                <PinKeypad
+                  value={newPinValue}
+                  onChange={setNewPinValue}
+                  onSubmit={(pin) => {
+                    newPinRef.current = pin;
+                    setNewPinValue('');
+                    setRepeatPinValue('');
+                    setPinError('');
+                    setChangePinStep('repeat');
+                  }}
+                  error={!!pinError}
+                />
+              </>
+            )}
+            {changePinStep === 'repeat' && (
+              <>
+                <PinKeypad
+                  value={repeatPinValue}
+                  onChange={setRepeatPinValue}
+                  onSubmit={async (pin) => {
+                    if (pin !== newPinRef.current) {
+                      Haptic.error();
+                      setPinError('Пароли не совпадают');
+                      setRepeatPinValue('');
+                      return;
+                    }
+                    setPinError('');
+                    await setPin(tgid, pin);
+                    Haptic.success();
+                    toast.show('Пароль успешно изменён', 'success');
+                    setChangePinStep(null);
+                  }}
+                  error={!!pinError}
+                />
+                {pinError && <p className="text-center text-red-500 text-sm mt-3">{pinError}</p>}
+                <button
+                  type="button"
+                  onClick={() => {
+                    Haptic.tap();
+                    setChangePinStep('new');
+                    setRepeatPinValue('');
+                    setNewPinValue('');
+                    setPinError('');
+                  }}
+                  className="mt-4 text-sm text-neutral-500 hover:text-white w-full"
+                >
+                  Назад
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

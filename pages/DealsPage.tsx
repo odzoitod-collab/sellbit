@@ -53,7 +53,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-20 space-y-3">
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-28 space-y-3">
                 
                 {activeTab === 'ACTIVE' && activeDeals.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-40 text-neutral-600">

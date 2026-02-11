@@ -13,7 +13,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({ balance }) => {
   }).format(balance);
 
   return (
-    <div className="flex flex-col items-center justify-center py-10 space-y-3 relative">
+    <div className="flex flex-col items-center justify-center pt-8 pb-3 space-y-3 relative">
       <span className="text-xs font-medium text-neutral-500 uppercase tracking-widest">
         Общий баланс
       </span>

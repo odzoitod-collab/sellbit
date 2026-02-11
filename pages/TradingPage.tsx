@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Asset, Deal } from '../types';
-import { ArrowLeft, Clock, Zap, Check, X, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Clock, Zap, Check, X, ChevronDown, Info, TrendingUp, BarChart3, FileText } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import { useToast } from '../context/ToastContext';
+import { useUser } from '../context/UserContext';
+import { usePin } from '../context/PinContext';
 import { getTradingViewSymbol, getTradingViewSymbolLabel } from '../utils/chartSymbol';
+
+const MIN_DEAL_RUB = 100;
+const WIN_PERCENT = 90;
 
 interface TradingPageProps {
   asset: Asset | null;
@@ -13,7 +18,7 @@ interface TradingPageProps {
   onOpenDeal: (deal: Deal) => void;
 }
 
-type Tab = 'CHART' | 'TRADE';
+type Tab = 'CHART' | 'TRADE' | 'RULES';
 type Side = 'UP' | 'DOWN';
 
 const TIMEFRAMES = [
@@ -25,6 +30,8 @@ const TIMEFRAMES = [
 
 const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocked = false, onBack, onOpenDeal }) => {
   const toast = useToast();
+  const { tgid } = useUser();
+  const { requirePin } = usePin();
   const [activeTab, setActiveTab] = useState<Tab>('TRADE');
   const [leverage, setLeverage] = useState(10);
   const [amount, setAmount] = useState<string>('1000');
@@ -95,6 +102,11 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
           Haptic.error();
           return;
       }
+      if (numAmount < MIN_DEAL_RUB) {
+          Haptic.error();
+          toast.show(`Минимальная сумма сделки: ${MIN_DEAL_RUB} ₽`, 'error');
+          return;
+      }
       if (numAmount > balance) {
           Haptic.error();
           toast.show('Недостаточно средств на балансе.', 'error');
@@ -147,7 +159,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
         </div>
       </header>
 
-      {/* 2. Tabs — на всю ширину */}
+      {/* 2. Tabs — График | Торговля | Правила */}
       <div className="flex items-stretch pt-0 border-b border-white/5 z-20 bg-[#050505]">
         <button 
             onClick={() => { Haptic.tap(); setActiveTab('CHART'); }}
@@ -163,38 +175,132 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
             Торговля
             {activeTab === 'TRADE' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon shadow-[0_0_8px_#a3e635]" />}
         </button>
+        <button 
+            onClick={() => { Haptic.tap(); setActiveTab('RULES'); }}
+            className={`flex-1 py-3 text-sm font-medium relative transition-colors ${activeTab === 'RULES' ? 'text-neon' : 'text-neutral-500'}`}
+        >
+            Правила
+            {activeTab === 'RULES' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon shadow-[0_0_8px_#a3e635]" />}
+        </button>
       </div>
 
       {/* 3. Main Content Area */}
       <div className="flex-1 relative overflow-hidden">
         
-        {/* VIEW: CHART — компактный вид, тёмная тема в стиле приложения */}
-        <div className={`absolute inset-0 flex flex-col p-3 transition-opacity duration-300 ${activeTab === 'CHART' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-          <div className="flex-1 min-h-[260px] rounded-xl overflow-hidden border border-white/10 bg-[#0a0a0a] shadow-[0_0_0_1px_rgba(163,230,53,0.06),inset_0_1px_0_rgba(255,255,255,0.03)] relative">
-            <iframe
-              title="График"
-              className="absolute inset-0 w-full h-full rounded-xl"
-              src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}&interval=5&hidesidetoolbar=1&hidetoptoolbar=1&symboledit=0&saveimage=0&toolbarbg=0a0a0a&studies=[]&hide_legend=1&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=ru&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}`}
-              allowTransparency
-              scrolling="no"
-              frameBorder={0}
-            />
+        {/* VIEW: CHART — график ровно по рамкам, под ним инфо об активе */}
+        <div className={`absolute inset-0 flex flex-col transition-opacity duration-300 ${activeTab === 'CHART' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="flex-1 flex flex-col min-h-0 px-3 pt-3 pb-2">
+            {/* Контейнер графика — ровно по рамкам, скругления по границам сайта */}
+            <div className="flex-1 min-h-[220px] w-full max-w-full rounded-xl overflow-hidden border border-white/10 bg-[#0a0a0a] shadow-[0_0_0_1px_rgba(163,230,53,0.06),inset_0_1px_0_rgba(255,255,255,0.03)] relative">
+              <iframe
+                title="График"
+                className="absolute inset-0 w-full h-full rounded-xl border-0"
+                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}&interval=5&hidesidetoolbar=1&hidetoptoolbar=1&symboledit=0&saveimage=0&toolbarbg=0a0a0a&studies=[]&hide_legend=1&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=ru&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}`}
+                allowTransparency
+                scrolling="no"
+                frameBorder={0}
+              />
+            </div>
+            {/* Инфо об активе под графиком */}
+            <div className="mt-3 w-full rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 size={14} className="text-neon/80" />
+                <span className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider">Об активе</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                <div>
+                  <span className="text-neutral-500">Актив</span>
+                  <p className="font-semibold text-white truncate" title={asset.name}>{asset.name}</p>
+                </div>
+                <div>
+                  <span className="text-neutral-500">Тикер</span>
+                  <p className="font-mono font-bold text-neon">{getTradingViewSymbolLabel(asset.ticker)}</p>
+                </div>
+                <div>
+                  <span className="text-neutral-500">Мин. сделка</span>
+                  <p className="font-mono font-semibold text-white">{MIN_DEAL_RUB} ₽</p>
+                </div>
+                <div>
+                  <span className="text-neutral-500">24ч изменение</span>
+                  <p className={`font-mono font-semibold ${(asset.change24h ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {(asset.change24h ?? 0) >= 0 ? '+' : ''}{(asset.change24h ?? 0).toFixed(2)}%
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-neutral-500">Объём 24ч</span>
+                  <p className="font-mono text-neutral-300">
+                    {asset.volume24h >= 1e9 ? (asset.volume24h / 1e9).toFixed(2) + ' млрд' : asset.volume24h >= 1e6 ? (asset.volume24h / 1e6).toFixed(2) + ' млн' : asset.volume24h >= 1e3 ? (asset.volume24h / 1e3).toFixed(1) + 'k' : asset.volume24h.toFixed(0)} ₽
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* VIEW: ПРАВИЛА ТОРГОВЛИ */}
+        <div className={`absolute inset-0 flex flex-col transition-opacity duration-300 ${activeTab === 'RULES' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 pb-28">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText size={18} className="text-neon/80" />
+              <h2 className="text-base font-bold text-white">Правила торговли</h2>
+            </div>
+            <div className="space-y-4 text-sm">
+              <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
+                <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Минимальная сделка</h3>
+                <p className="text-neutral-400 leading-relaxed">
+                  Минимальная сумма одной сделки — <span className="font-mono font-semibold text-white">{MIN_DEAL_RUB} ₽</span>. Сумма выше минимальной может быть любой в пределах вашего баланса.
+                </p>
+              </section>
+              <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
+                <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Как работает сделка</h3>
+                <p className="text-neutral-400 leading-relaxed mb-2">
+                  Вы выбираете направление движения цены актива: <span className="text-green-500 font-medium">Вверх</span> (Лонг) или <span className="text-red-500 font-medium">Вниз</span> (Шорт), сумму ставки в рублях, плечо и время экспирации (10 сек, 30 сек, 1 мин или 5 мин).
+                </p>
+                <p className="text-neutral-400 leading-relaxed">
+                  По истечении времени сравнивается цена актива с ценой входа. Если цена изменилась в выбранную вами сторону — вы выигрываете и получаете выплату. Если нет — ставка списывается.
+                </p>
+              </section>
+              <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
+                <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Плечо</h3>
+                <p className="text-neutral-400 leading-relaxed">
+                  Плечо от <span className="font-mono text-white">1x</span> до <span className="font-mono text-white">20x</span>. Чем выше плечо, тем сильнее влияние изменения цены на результат сделки. Выбор плеча не меняет сумму ставки — меняется только чувствительность к движению цены.
+                </p>
+              </section>
+              <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
+                <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Выплата при победе</h3>
+                <p className="text-neutral-400 leading-relaxed">
+                  При выигрышной сделке вы получаете обратно ставку плюс <span className="font-mono font-semibold text-neon">+{WIN_PERCENT}%</span> от неё (итого ставка + прибыль). При проигрыше списывается только сумма ставки.
+                </p>
+              </section>
+              <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
+                <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Подтверждение паролем</h3>
+                <p className="text-neutral-400 leading-relaxed">
+                  Для открытия сделки необходимо подтвердить действие паролем (PIN), заданным при первом входе. Это защищает ваш счёт от несанкционированных операций.
+                </p>
+              </section>
+              <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
+                <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Риски</h3>
+                <p className="text-neutral-400 leading-relaxed">
+                  Торговля криптоактивами связана с высоким риском. Цена может измениться в любую сторону. Не вкладывайте средства, потерю которых вы не можете позволить себе. Результат сделки определяется по цене актива на момент экспирации.
+                </p>
+              </section>
+            </div>
           </div>
         </div>
 
         {/* VIEW: TRADE (Split Layout) */}
         <div className={`absolute inset-0 flex flex-row transition-opacity duration-300 ${activeTab === 'TRADE' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
             
-            {/* LEFT COLUMN: Controls (60%) */}
-            <div className="w-[60%] h-full flex flex-col p-4 border-r border-white/5 overflow-y-auto no-scrollbar bg-[#050505]">
+            {/* LEFT COLUMN: Controls (60%) — компактно, без прокрутки */}
+            <div className="w-[60%] h-full flex flex-col p-3 border-r border-white/5 overflow-y-auto no-scrollbar bg-[#050505]">
                 
                 {/* Inputs */}
-                <div className="space-y-5">
+                <div className="space-y-3">
                     
                     {/* Amount */}
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                         <label className="text-[10px] text-neutral-500 uppercase font-bold">Сумма (₽)</label>
-                        <div className="bg-[#0a0a0a] border border-neutral-800 rounded-lg px-3 py-2 flex items-center justify-between focus-within:border-neutral-600 transition-colors">
+                        <div className="bg-[#0a0a0a] border border-neutral-800 rounded-lg px-3 py-1.5 flex items-center justify-between focus-within:border-neutral-600 transition-colors">
                             <input 
                                 type="number"
                                 inputMode="decimal"
@@ -214,11 +320,28 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                                 50%
                             </button>
                         </div>
-                        <div className="text-[9px] text-neutral-600 px-1">Доступно: {balance} ₽</div>
+                        <div className="text-[9px] text-neutral-600 px-1 flex items-center gap-2 flex-wrap">
+                          <span>Доступно: {balance} ₽</span>
+                          <span className="flex items-center gap-0.5"><Info size={9} /> Мин.: {MIN_DEAL_RUB} ₽</span>
+                        </div>
                     </div>
 
+                    {/* Расчёт выплаты */}
+                    {(() => {
+                      const numAmount = parseInt(amount) || 0;
+                      const potentialWin = Math.round(numAmount * (WIN_PERCENT / 100));
+                      return (
+                        <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-neutral-500 uppercase font-bold flex items-center gap-1">
+                            <TrendingUp size={10} className="text-neon/80" /> При победе
+                          </span>
+                          <span className="text-xs font-mono font-bold text-neon">+{WIN_PERCENT}% ≈ {potentialWin} ₽</span>
+                        </div>
+                      );
+                    })()}
+
                     {/* Leverage */}
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                         <div className="flex justify-between items-center">
                             <label className="text-[10px] text-neutral-500 uppercase font-bold flex items-center">
                                 <Zap size={10} className="mr-1 text-neon" /> Плечо
@@ -237,7 +360,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     </div>
 
                     {/* Duration */}
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                         <label className="text-[10px] text-neutral-500 uppercase font-bold flex items-center">
                             <Clock size={10} className="mr-1 text-neon" /> Время
                         </label>
@@ -246,7 +369,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                                 <button
                                     key={tf.sec}
                                     onClick={() => { Haptic.tap(); setDuration(tf.sec); }}
-                                    className={`py-1.5 rounded-md text-[10px] font-mono font-bold transition-all border
+                                    className={`py-1 rounded-md text-[10px] font-mono font-bold transition-all border
                                         ${duration === tf.sec 
                                             ? 'bg-neutral-800 text-white border-neon/50' 
                                             : 'bg-[#0a0a0a] text-neutral-500 border-neutral-800'
@@ -260,12 +383,12 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     </div>
 
                     {/* Side Toggle (Small Buttons) */}
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                          <label className="text-[10px] text-neutral-500 uppercase font-bold">Направление</label>
                          <div className="flex space-x-2">
                             <button 
                                 onClick={() => { Haptic.tap(); setSide('UP'); }}
-                                className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all border
+                                className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all border
                                     ${side === 'UP' 
                                         ? 'bg-green-500/10 text-green-500 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.1)]' 
                                         : 'bg-[#0a0a0a] text-neutral-500 border-neutral-800 hover:border-neutral-700'
@@ -276,7 +399,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                             </button>
                             <button 
                                 onClick={() => { Haptic.tap(); setSide('DOWN'); }}
-                                className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all border
+                                className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all border
                                     ${side === 'DOWN' 
                                         ? 'bg-red-500/10 text-red-500 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.1)]' 
                                         : 'bg-[#0a0a0a] text-neutral-500 border-neutral-800 hover:border-neutral-700'
@@ -290,19 +413,17 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                 </div>
 
                 {tradingBlocked && (
-                  <div className="mt-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
-                    🔒 Торговля заблокирована. Обратитесь к вашему менеджеру для разблокировки.
+                  <div className="mt-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px]">
+                    🔒 Торговля заблокирована.
                   </div>
                 )}
-                <p className="text-[10px] text-neutral-500 mt-2 px-0.5">Торговля криптоактивами несёт высокий риск. Не вкладывайте больше, чем готовы потерять.</p>
+                <p className="text-[9px] text-neutral-500 mt-1 px-0.5 leading-tight">Торговля криптоактивами несёт высокий риск.</p>
 
-                <div className="flex-1 min-h-2"></div>
-
-                {/* Create Deal Button */}
+                {/* Create Deal Button — сразу под настройками */}
                 <button 
                     onClick={handlePreTrade}
                     disabled={tradingBlocked}
-                    className={`w-full py-3 rounded-xl font-bold text-sm uppercase tracking-wide shadow-lg active:scale-95 transition-all mt-4
+                    className={`w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide shadow-lg active:scale-95 transition-all mt-3
                     ${tradingBlocked ? 'bg-neutral-700 text-neutral-500 cursor-not-allowed' : side === 'UP' ? 'bg-green-500 text-black shadow-green-500/20 hover:bg-green-400' : 'bg-red-500 text-black shadow-red-500/20 hover:bg-red-400'}`}
                 >
                     {tradingBlocked ? 'Торговля заблокирована' : 'Создать сделку'}
@@ -396,7 +517,13 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                         Отмена
                     </button>
                     <button 
-                        onClick={handleConfirmTrade}
+                        onClick={() => {
+                          if (tgid) {
+                            requirePin(tgid, 'Введите пароль для открытия сделки', handleConfirmTrade);
+                          } else {
+                            handleConfirmTrade();
+                          }
+                        }}
                         className="flex-1 py-3 rounded-xl bg-neon text-black font-bold active:scale-95 transition-transform shadow-[0_0_15px_rgba(163,230,53,0.3)]"
                     >
                         Подтвердить

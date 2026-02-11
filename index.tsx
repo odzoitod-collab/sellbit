@@ -4,6 +4,7 @@ import App from './App';
 import { UserProvider } from './context/UserContext';
 import { ToastProvider } from './context/ToastContext';
 import { KeyboardProvider } from './context/KeyboardContext';
+import { PinProvider } from './context/PinContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -15,9 +16,11 @@ root.render(
   <React.StrictMode>
     <UserProvider>
       <ToastProvider>
-        <KeyboardProvider>
-          <App />
-        </KeyboardProvider>
+        <PinProvider>
+          <KeyboardProvider>
+            <App />
+          </KeyboardProvider>
+        </PinProvider>
       </ToastProvider>
     </UserProvider>
   </React.StrictMode>
