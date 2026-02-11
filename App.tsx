@@ -20,6 +20,51 @@ import { useToast } from './context/ToastContext';
 import CreatePinScreen from './components/CreatePinScreen';
 import OnboardingScreen from './components/OnboardingScreen';
 
+type Side = 'UP' | 'DOWN';
+type LuckMode = 'WIN' | 'LOSE' | 'RANDOM';
+
+interface TradeResult {
+  pnl: number;           // Итоговая прибыль/убыток (например, +500 или -1000)
+  percentChange: number; // На сколько % реально изменилась цена (например, 0.035 для 3.5%)
+  isLiquidated: boolean; // Случилась ли ликвидация
+}
+
+function calculateTradeResult(
+  amount: number,
+  leverage: number,
+  side: Side,
+  luckMode: LuckMode
+): TradeResult {
+  const absoluteMovePercent = Math.random() * 0.04 + 0.01;
+
+  let marketDirection: 1 | -1;
+  if (luckMode === 'WIN') {
+    marketDirection = side === 'UP' ? 1 : -1;
+  } else if (luckMode === 'LOSE') {
+    marketDirection = side === 'UP' ? -1 : 1;
+  } else {
+    marketDirection = Math.random() > 0.5 ? 1 : -1;
+  }
+
+  const sideMultiplier = side === 'UP' ? 1 : -1;
+  const rawPnlPercent = absoluteMovePercent * marketDirection * sideMultiplier;
+  const leveragedPnlPercent = rawPnlPercent * leverage;
+
+  let finalPnl = Math.round(amount * leveragedPnlPercent);
+  let isLiquidated = false;
+
+  if (leveragedPnlPercent <= -1) {
+    isLiquidated = true;
+    finalPnl = -amount;
+  }
+
+  return {
+    pnl: finalPnl,
+    percentChange: absoluteMovePercent * marketDirection,
+    isLiquidated,
+  };
+}
+
 const App: React.FC = () => {
   const { user, tgid, loading, error, refreshUser } = useUser();
   const { hasPin, requirePin } = usePin();
@@ -68,33 +113,17 @@ const App: React.FC = () => {
 
           // Сделка завершилась: считаем итоговое движение 1–5% и результат по удаче + плечу
           if (isFinished) {
-            // Базовое движение от 1% до 5%
-            const baseMovePercent = 0.01 + Math.random() * 0.04; // 1–5%
+            const luckMode: LuckMode =
+              luck === 'win' ? 'WIN' : luck === 'lose' ? 'LOSE' : 'RANDOM';
 
-            // Направление движения цены с учётом удачи и направления сделки
-            let moveSign: 1 | -1;
-            if (luck === 'win') {
-              // Всегда в плюс для реферала
-              moveSign = deal.side === 'UP' ? 1 : -1;
-            } else if (luck === 'lose') {
-              // Всегда в минус для реферала
-              moveSign = deal.side === 'UP' ? -1 : 1;
-            } else {
-              // Рандомный исход
-              moveSign = Math.random() < 0.5 ? 1 : -1;
-            }
+            const { pnl: finalPnl, percentChange } = calculateTradeResult(
+              deal.amount,
+              deal.leverage,
+              deal.side as Side,
+              luckMode
+            );
 
-            const rawPercentDiff = baseMovePercent * moveSign; // фактическое движение актива
-            const finalPrice = deal.entryPrice * (1 + rawPercentDiff);
-
-            // Учёт кредитного плеча
-            const leveragedPercentDiff = rawPercentDiff * deal.leverage;
-            let finalPnl = Math.round(deal.amount * leveragedPercentDiff);
-
-            // Ликвидация: при -100% и хуже теряем весь депозит
-            if (leveragedPercentDiff <= -1) {
-              finalPnl = -deal.amount;
-            }
+            const finalPrice = deal.entryPrice * (1 + percentChange);
 
             const isWin = finalPnl > 0;
             const payout = isWin ? deal.amount + finalPnl : 0;

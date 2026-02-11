@@ -328,20 +328,22 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     {/* Пример потенциальной прибыли при движении цены */}
                     {(() => {
                       const numAmount = parseInt(amount) || 0;
-                      const assumedMove = 0.05; // 5% движения актива
-                      const potentialPnl = Math.round(numAmount * assumedMove * leverage);
+                      // Показываем пример для среднего движения в 3%
+                      const avgMove = 0.03; 
+                      const potentialProfit = Math.round(numAmount * avgMove * leverage);
+                      
                       return (
                         <>
                           <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
                             <span className="text-[10px] text-neutral-500 uppercase font-bold flex items-center gap-1">
-                              <TrendingUp size={10} className="text-neon/80" /> При движении +5% в вашу сторону
+                              <TrendingUp size={10} className="text-neon/80" /> При движении 3%
                             </span>
                             <span className="text-xs font-mono font-bold text-neon">
-                              ≈ +{isNaN(potentialPnl) ? 0 : potentialPnl} ₽
+                              ≈ ±{potentialProfit} ₽
                             </span>
                           </div>
                           <p className="text-[9px] text-neutral-500 px-0.5 mt-0.5 leading-tight">
-                            Фактический результат зависит от реального изменения цены (обычно 1–5%) и выбранного плеча.
+                            Результат зависит от волатильности (1-5%) и плеча.
                           </p>
                         </>
                       );
