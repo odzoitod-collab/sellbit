@@ -1,19 +1,21 @@
-# Render Blueprint — статический сайт (SPA)
-# Если репозиторий — монорепо (корень sellbit), в Dashboard укажите Root Directory: neonflow-crypto-exchange
+# Render Blueprint — статический сайт (Vite + React SPA)
+# Монорепо: в Dashboard укажите Root Directory = neonflow-crypto-exchange
 
 services:
   - type: web
     name: neonflow-crypto-exchange
     runtime: static
 
-    buildCommand: npm install && npm run build
+    # Корень сервиса (если репо — монорепо sellbit)
+    rootDir: neonflow-crypto-exchange
+
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
 
-    # SPA: все маршруты отдавать index.html (клиентский роутинг)
+    # SPA: все маршруты отдавать index.html
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
 
-    # Автодеплой при пуше в ветку по умолчанию
     autoDeployTrigger: commit

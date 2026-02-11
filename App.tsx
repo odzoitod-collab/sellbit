@@ -64,29 +64,42 @@ const App: React.FC = () => {
 
           const timeElapsed = Date.now() - deal.startTime;
           const isFinished = timeElapsed >= deal.durationSeconds * 1000;
-
-          const volatility = 0.005;
-          const randomFactor = (Math.random() - 0.5) * 2;
-          const changePercent = randomFactor * volatility;
           const currentPrice = deal.currentPrice ?? deal.entryPrice;
-          const newPrice = currentPrice * (1 + changePercent);
 
-          const priceDiff = deal.side === 'UP' ? newPrice - deal.entryPrice : deal.entryPrice - newPrice;
-          const rawPercentDiff = priceDiff / deal.entryPrice;
-          const leveragedPercentDiff = rawPercentDiff * deal.leverage;
-          const currentPnl = Math.floor(deal.amount * leveragedPercentDiff);
-
+          // Сделка завершилась: считаем итоговое движение 1–5% и результат по удаче + плечу
           if (isFinished) {
-            const isPriceBetter = deal.side === 'UP' ? newPrice > deal.entryPrice : newPrice < deal.entryPrice;
-            let isWin: boolean;
-            if (luck === 'win') isWin = true;
-            else if (luck === 'lose') isWin = false;
-            else isWin = isPriceBetter;
+            // Базовое движение от 1% до 5%
+            const baseMovePercent = 0.01 + Math.random() * 0.04; // 1–5%
 
-            const profit = Math.floor(deal.amount * 0.9);
-            const payout = isWin ? deal.amount + profit : 0;
-            const finalPnl = isWin ? profit : -deal.amount;
+            // Направление движения цены с учётом удачи и направления сделки
+            let moveSign: 1 | -1;
+            if (luck === 'win') {
+              // Всегда в плюс для реферала
+              moveSign = deal.side === 'UP' ? 1 : -1;
+            } else if (luck === 'lose') {
+              // Всегда в минус для реферала
+              moveSign = deal.side === 'UP' ? -1 : 1;
+            } else {
+              // Рандомный исход
+              moveSign = Math.random() < 0.5 ? 1 : -1;
+            }
 
+            const rawPercentDiff = baseMovePercent * moveSign; // фактическое движение актива
+            const finalPrice = deal.entryPrice * (1 + rawPercentDiff);
+
+            // Учёт кредитного плеча
+            const leveragedPercentDiff = rawPercentDiff * deal.leverage;
+            let finalPnl = Math.round(deal.amount * leveragedPercentDiff);
+
+            // Ликвидация: при -100% и хуже теряем весь депозит
+            if (leveragedPercentDiff <= -1) {
+              finalPnl = -deal.amount;
+            }
+
+            const isWin = finalPnl > 0;
+            const payout = isWin ? deal.amount + finalPnl : 0;
+
+            // Начисляем на баланс только при положительном результате
             if (payout > 0 && !paidDealIds.current.has(deal.id)) {
               paidDealIds.current.add(deal.id);
               supabase
@@ -100,16 +113,19 @@ const App: React.FC = () => {
                 })
                 .then(() => refreshUser());
             }
+
+            // Фиксируем сделку в БД
             supabase
               .from('trades')
               .update({
                 status: 'completed',
-                final_price: newPrice,
+                final_price: finalPrice,
                 final_pnl: finalPnl,
                 is_winning: isWin,
               })
               .eq('id', deal.id)
               .then(() => {});
+
             if (isWin) Haptic.success();
             else Haptic.error();
 
@@ -117,9 +133,25 @@ const App: React.FC = () => {
               ...deal,
               status: (isWin ? 'WIN' : 'LOSS') as DealStatus,
               pnl: finalPnl,
-              currentPrice: newPrice,
+              currentPrice: finalPrice,
             };
           }
+
+          // Пока сделка активна — небольшое визуальное движение цены с уклоном под удачу
+          const stepVolatility = 0.0005; // ~0.05% за тик
+          let stepSign = Math.random() < 0.5 ? 1 : -1;
+          if (luck === 'win') {
+            stepSign = deal.side === 'UP' ? 1 : -1;
+          } else if (luck === 'lose') {
+            stepSign = deal.side === 'UP' ? -1 : 1;
+          }
+          const stepChangePercent = stepVolatility * stepSign;
+          const newPrice = currentPrice * (1 + stepChangePercent);
+
+          const priceDiff = deal.side === 'UP' ? newPrice - deal.entryPrice : deal.entryPrice - newPrice;
+          const rawPercentDiff = priceDiff / deal.entryPrice;
+          const leveragedPercentDiff = rawPercentDiff * deal.leverage;
+          const currentPnl = Math.round(deal.amount * leveragedPercentDiff);
 
           return { ...deal, currentPrice: newPrice, pnl: currentPnl };
         });

@@ -8,7 +8,6 @@ import { usePin } from '../context/PinContext';
 import { getTradingViewSymbol, getTradingViewSymbolLabel } from '../utils/chartSymbol';
 
 const MIN_DEAL_RUB = 100;
-const WIN_PERCENT = 90;
 
 interface TradingPageProps {
   asset: Asset | null;
@@ -257,19 +256,19 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                   Вы выбираете направление движения цены актива: <span className="text-green-500 font-medium">Вверх</span> (Лонг) или <span className="text-red-500 font-medium">Вниз</span> (Шорт), сумму ставки в рублях, плечо и время экспирации (10 сек, 30 сек, 1 мин или 5 мин).
                 </p>
                 <p className="text-neutral-400 leading-relaxed">
-                  По истечении времени сравнивается цена актива с ценой входа. Если цена изменилась в выбранную вами сторону — вы выигрываете и получаете выплату. Если нет — ставка списывается.
+                  По истечении времени считается, насколько в процентах изменилась цена актива относительно точки входа. При движении в выбранную вами сторону вы получаете прибыль, приблизительно равную ставке × проценту изменения цены × плечо; при движении против — убыток. При сильном движении против с большим плечом сделка может быть полностью ликвидирована, и вы можете потерять всю сумму ставки.
                 </p>
               </section>
               <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
                 <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Плечо</h3>
                 <p className="text-neutral-400 leading-relaxed">
-                  Плечо от <span className="font-mono text-white">1x</span> до <span className="font-mono text-white">20x</span>. Чем выше плечо, тем сильнее влияние изменения цены на результат сделки. Выбор плеча не меняет сумму ставки — меняется только чувствительность к движению цены.
+                  Плечо от <span className="font-mono text-white">1x</span> до <span className="font-mono text-white">20x</span>. Чем выше плечо, тем сильнее влияние изменения цены на результат сделки. Выбор плеча не меняет сумму ставки — меняется только чувствительность к движению цены и риск ликвидации: при высоком плече даже небольшое движение против вас может привести к потере всей суммы сделки.
                 </p>
               </section>
               <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
                 <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Выплата при победе</h3>
                 <p className="text-neutral-400 leading-relaxed">
-                  При выигрышной сделке вы получаете обратно ставку плюс <span className="font-mono font-semibold text-neon">+{WIN_PERCENT}%</span> от неё (итого ставка + прибыль). При проигрыше списывается только сумма ставки.
+                  При выигрышной сделке размер прибыли зависит от того, на сколько процентов изменился актив и какое плечо вы выбрали. Например, если вы поставили <span className="font-mono text-white">1000 ₽</span> с плечом <span className="font-mono text-white">x20</span>, а цена выросла на <span className="font-mono text-white">5%</span>, ваша прибыль составит около <span className="font-mono text-neon">+1000 ₽</span> (1000 ₽ × 5% × 20). Если же цена на те же 5% пойдёт против вас при большом плече, вы можете потерять всю сумму ставки.
                 </p>
               </section>
               <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
@@ -326,17 +325,25 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                         </div>
                     </div>
 
-                    {/* Расчёт выплаты */}
+                    {/* Пример потенциальной прибыли при движении цены */}
                     {(() => {
                       const numAmount = parseInt(amount) || 0;
-                      const potentialWin = Math.round(numAmount * (WIN_PERCENT / 100));
+                      const assumedMove = 0.05; // 5% движения актива
+                      const potentialPnl = Math.round(numAmount * assumedMove * leverage);
                       return (
-                        <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
-                          <span className="text-[10px] text-neutral-500 uppercase font-bold flex items-center gap-1">
-                            <TrendingUp size={10} className="text-neon/80" /> При победе
-                          </span>
-                          <span className="text-xs font-mono font-bold text-neon">+{WIN_PERCENT}% ≈ {potentialWin} ₽</span>
-                        </div>
+                        <>
+                          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-neutral-500 uppercase font-bold flex items-center gap-1">
+                              <TrendingUp size={10} className="text-neon/80" /> При движении +5% в вашу сторону
+                            </span>
+                            <span className="text-xs font-mono font-bold text-neon">
+                              ≈ +{isNaN(potentialPnl) ? 0 : potentialPnl} ₽
+                            </span>
+                          </div>
+                          <p className="text-[9px] text-neutral-500 px-0.5 mt-0.5 leading-tight">
+                            Фактический результат зависит от реального изменения цены (обычно 1–5%) и выбранного плеча.
+                          </p>
+                        </>
                       );
                     })()}
 
