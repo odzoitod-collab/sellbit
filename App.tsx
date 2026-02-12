@@ -166,15 +166,21 @@ const App: React.FC = () => {
             };
           }
 
-          // Пока сделка активна — небольшое визуальное движение цены с уклоном под удачу
-          const stepVolatility = 0.0005; // ~0.05% за тик
-          let stepSign = Math.random() < 0.5 ? 1 : -1;
+          // Пока сделка активна — рывками и с колебаниями, с общим уклоном под удачу
+          const baseVolatility = 0.0003 + Math.random() * 0.0012; // переменный шаг ~0.03–0.15%
+          let stepSign: number;
           if (luck === 'win') {
             stepSign = deal.side === 'UP' ? 1 : -1;
           } else if (luck === 'lose') {
             stepSign = deal.side === 'UP' ? -1 : 1;
+          } else {
+            stepSign = Math.random() > 0.5 ? 1 : -1;
           }
-          const stepChangePercent = stepVolatility * stepSign;
+          // 25% шанс отката против тренда — имитация колебаний
+          if (Math.random() < 0.25) stepSign *= -1;
+          // 10% шанс более резкого скачка (~0.2–0.4%)
+          const isSpike = Math.random() < 0.1;
+          const stepChangePercent = (isSpike ? 0.002 + Math.random() * 0.002 : baseVolatility) * stepSign;
           const newPrice = currentPrice * (1 + stepChangePercent);
 
           const priceDiff = deal.side === 'UP' ? newPrice - deal.entryPrice : deal.entryPrice - newPrice;
