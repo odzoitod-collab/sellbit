@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Asset } from '../types';
 import { Filter } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
+import { useCurrency } from '../context/CurrencyContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export type FilterType = 'Top' | 'Gainers' | 'Losers' | 'Vol' | 'New';
 
@@ -19,17 +21,17 @@ const AssetTable: React.FC<AssetTableProps> = ({
   hideFilterBar = false 
 }) => {
   const [internalFilter, setInternalFilter] = useState<FilterType>('Top');
+  const { formatPrice, symbol } = useCurrency();
+  const { t } = useLanguage();
 
-  // Use external filter if provided, otherwise use internal state
   const activeFilter = externalFilter || internalFilter;
 
-  // Mapping internal logic to Russian display names
-  const filters: { key: FilterType; label: string }[] = [
-    { key: 'Top', label: 'Топ' },
-    { key: 'Gainers', label: 'Рост' },
-    { key: 'Losers', label: 'Падение' },
-    { key: 'Vol', label: 'Объем' },
-    { key: 'New', label: 'Новые' },
+  const filters: { key: FilterType; labelKey: string }[] = [
+    { key: 'Top', labelKey: 'filter_top' },
+    { key: 'Gainers', labelKey: 'filter_gainers' },
+    { key: 'Losers', labelKey: 'filter_losers' },
+    { key: 'Vol', labelKey: 'filter_vol' },
+    { key: 'New', labelKey: 'filter_new' },
   ];
 
   const sortedAssets = [...assets].sort((a, b) => {
@@ -41,19 +43,11 @@ const AssetTable: React.FC<AssetTableProps> = ({
     }
   });
 
-  const formatPrice = (price: number) => {
-    const fractionDigits = price < 1 ? 6 : (price < 100 ? 2 : 0);
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'decimal',
-      minimumFractionDigits: fractionDigits,
-      maximumFractionDigits: fractionDigits,
-    }).format(price);
-  };
 
   const formatVol = (vol: number) => {
-    if (vol >= 1000000000) return (vol / 1000000000).toFixed(1) + 'млрд';
-    if (vol >= 1000000) return (vol / 1000000).toFixed(1) + 'млн';
-    return (vol / 1000).toFixed(0) + 'тыс';
+    if (vol >= 1000000000) return (vol / 1000000000).toFixed(1) + t('vol_b');
+    if (vol >= 1000000) return (vol / 1000000).toFixed(1) + t('vol_m');
+    return (vol / 1000).toFixed(0) + t('vol_k');
   };
 
   return (
@@ -69,16 +63,16 @@ const AssetTable: React.FC<AssetTableProps> = ({
                 activeFilter === filter.key ? 'bg-white/10 text-neon' : 'text-neutral-500 hover:text-neutral-300'
               }`}
             >
-              {filter.label}
+              {t(filter.labelKey)}
             </button>
           ))}
         </div>
       )}
 
       <div className="grid grid-cols-12 gap-1 text-[10px] uppercase tracking-wider text-neutral-500 mb-0.5 px-1">
-        <div className="col-span-5 text-left">Пара</div>
-        <div className="col-span-3 text-right">Цена</div>
-        <div className="col-span-4 text-right">24ч</div>
+        <div className="col-span-5 text-left">{t('pair')}</div>
+        <div className="col-span-3 text-right">{t('price')}</div>
+        <div className="col-span-4 text-right">{t('change_24h')}</div>
       </div>
 
       <div className="flex flex-col gap-0.5 pb-4">
@@ -98,7 +92,7 @@ const AssetTable: React.FC<AssetTableProps> = ({
               <span className="text-xs font-mono text-white tabular-nums">
                 {formatPrice(asset.price)}
               </span>
-              <span className="text-[9px] text-neutral-500">₽</span>
+              <span className="text-[9px] text-neutral-500">{symbol}</span>
             </div>
             <div className="col-span-4 flex flex-col items-end justify-center">
               <span className={`text-xs font-mono tabular-nums ${asset.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>

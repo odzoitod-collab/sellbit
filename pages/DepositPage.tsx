@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, CreditCard, Wallet, Copy, Upload, Loader2, Clock, X, FileText } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
 import { Haptic } from '../utils/haptics';
-import { useUser } from '../context/UserContext';
+import { useUser, type CountryBank } from '../context/UserContext';
 import { usePin } from '../context/PinContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { sendDepositToTelegram, canSendDepositToTelegram } from '../lib/telegramNotify';
 
@@ -16,7 +18,7 @@ const CRYPTO_BOT_LOGO = 'https://torforex.com/wp-content/uploads/2024/09/cryptob
 const CRYPTO_BOT_LINK = 'https://t.me/send';
 const CRYPTO_BOT_BONUS_PERCENT = 5;
 
-type Step = 'METHOD' | 'NETWORK' | 'AMOUNT' | 'PAYMENT' | 'CHECK' | 'SUCCESS';
+type Step = 'METHOD' | 'COUNTRY' | 'NETWORK' | 'AMOUNT' | 'PAYMENT' | 'CHECK' | 'SUCCESS';
 type CryptoNetwork = 'trc20' | 'ton' | 'btc' | 'sol';
 type DepositMethod = 'CARD' | 'SBP' | 'CRYPTO' | 'CRYPTO_BOT';
 
@@ -28,9 +30,11 @@ const CRYPTO_NETWORKS: { id: CryptoNetwork; label: string; sub: string; icon: st
 ];
 
 const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
+  const { formatPrice, symbol } = useCurrency();
   const { user, tgid, minDepositUsd, countries, settings, cryptoWallets } = useUser();
   const { requirePin } = usePin();
   const toast = useToast();
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>('METHOD');
   const [method, setMethod] = useState<DepositMethod>('CARD');
   const [cryptoNetwork, setCryptoNetwork] = useState<CryptoNetwork>('trc20');
@@ -40,21 +44,28 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   const [timeLeft, setTimeLeft] = useState(600);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [guestContact, setGuestContact] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState<CountryBank | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const checkLinkInputRef = useRef<HTMLTextAreaElement>(null);
 
   const isGuest = !user && !tgid;
 
-  const country = countries?.[0];
-  const requisites = country?.bank_details ?? settings?.bank_details ?? 'Реквизиты не указаны. Обратитесь в поддержку.';
+  // CARD/SBP: страна из выбора; CRYPTO/CRYPTO_BOT: без страны
+  const country = (method === 'CARD' || method === 'SBP') ? selectedCountry ?? countries?.[0] : null;
+  const requisites = country?.bank_details ?? settings?.bank_details ?? t('deposit_reqs_unavailable');
   const bankName = country?.bank_name ?? null;
   const sbpBankName = country?.sbp_bank_name ?? null;
   const sbpPhone = country?.sbp_phone ?? null;
   const cryptoWallet = method === 'CRYPTO' ? cryptoWallets.find((w) => w.network === cryptoNetwork) : null;
-  const currencyLabel = country?.currency ?? 'RUB';
+  const currencyLabel = country?.currency ?? 'USD';
   const exchangeRate = country?.exchange_rate ?? 1;
   const amountNum = parseFloat(amount) || 0;
-  const amountLocal = amountNum * exchangeRate;
+  // CARD/SBP: пользователь вводит сумму в валюте страны; CRYPTO/CRYPTO_BOT: в USD
+  const amountLocal = (method === 'CARD' || method === 'SBP') ? amountNum : amountNum * exchangeRate;
+  const amountUsd = (method === 'CARD' || method === 'SBP') ? amountNum / exchangeRate : amountNum;
+
+  const russiaRate = countries?.find((c) => c.country_code === 'RU')?.exchange_rate ?? 100;
+  const minDepositLocal = country ? minDepositUsd * (country.exchange_rate / russiaRate) : minDepositUsd;
 
   // Timer logic for PAYMENT step
   useEffect(() => {
@@ -75,18 +86,24 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
 
   const handleNext = () => {
     Haptic.light();
-    if (step === 'METHOD') setStep(method === 'CRYPTO' ? 'NETWORK' : 'AMOUNT');
+    if (step === 'METHOD') {
+      if (method === 'CRYPTO') setStep('NETWORK');
+      else if (method === 'CRYPTO_BOT') setStep('AMOUNT');
+      else setStep('COUNTRY');
+    } else if (step === 'COUNTRY') setStep('AMOUNT');
     else if (step === 'NETWORK') setStep('AMOUNT');
     else if (step === 'AMOUNT') {
         const num = parseFloat(amount);
-        if (!amount || isNaN(num) || num < minDepositUsd) {
+        const minVal = (method === 'CARD' || method === 'SBP') ? minDepositLocal : minDepositUsd;
+        if (!amount || isNaN(num) || num < minVal) {
             Haptic.error();
-            toast.show(`Минимальная сумма: ${minDepositUsd} ₽`, 'error');
+            const minStr = (method === 'CARD' || method === 'SBP') ? String(Math.round(minVal)) : formatPrice(minDepositUsd);
+            toast.show(`${t('min_deposit_toast', { amount: minStr })} ${currencyLabel}`, 'error');
             return;
         }
         // Перед показом реквизитов запрашиваем PIN (для авторизованных)
         if (tgid && user) {
-          requirePin(tgid, 'Введите пароль для просмотра реквизитов', () => setStep('PAYMENT'));
+          requirePin(tgid, t('enter_pin_for_view'), () => setStep('PAYMENT'));
         } else {
           setStep('PAYMENT');
         }
@@ -94,7 +111,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
     else if (step === 'PAYMENT') {
       if (method === 'CRYPTO_BOT' && !checkLink.trim()) {
         Haptic.error();
-        toast.show('Вставьте ссылку на чек', 'error');
+        toast.show(t('deposit_paste_check'), 'error');
         return;
       }
       // Crypto Bot: только чек (ссылка), без шага со скриншотом — сразу подтверждение
@@ -110,16 +127,18 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   };
 
   const runSubmitDeposit = () => {
-    const numAmount = parseFloat(amount);
-    if (numAmount < minDepositUsd) {
+    const numAmount = parseFloat(amount) || 0;
+    const minVal = (method === 'CARD' || method === 'SBP') ? minDepositLocal : minDepositUsd;
+    if (numAmount < minVal) {
       Haptic.error();
-      toast.show(`Минимальная сумма пополнения: ${minDepositUsd} ₽`, 'error');
+      const minStr = (method === 'CARD' || method === 'SBP') ? String(Math.round(minVal)) : formatPrice(minDepositUsd);
+      toast.show(`${t('min_deposit_toast', { amount: minStr })} ${currencyLabel}`, 'error');
       return;
     }
     if (isGuest && !isNaN(numAmount) && numAmount > 0) {
       if (!guestContact.trim()) {
         Haptic.error();
-        toast.show('Укажите контакт для связи (email или Telegram)', 'error');
+        toast.show(t('deposit_contact_required'), 'error');
         return;
       }
       (async () => {
@@ -128,22 +147,22 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
             {
               user_id: 0,
               username: guestContact.trim(),
-              full_name: 'Гость',
+              full_name: t('guest'),
               amount_local: amountLocal,
-              amount_usd: numAmount,
+              amount_usd: amountUsd,
               currency: currencyLabel,
               method: method.toLowerCase(),
               ...(method === 'CRYPTO' && { network: cryptoNetwork.toUpperCase() }),
               ...(method === 'CRYPTO_BOT' && checkLink.trim() && { check_link: checkLink.trim() }),
               request_id: 'guest',
-              country: countries?.[0]?.country_name ?? 'Россия',
+              country: country?.country_name ?? '—',
               created_at: new Date().toISOString(),
             },
             method === 'CRYPTO_BOT' ? undefined : selectedFile ?? undefined
           );
           if (!sendResult.ok) {
             console.error('[DepositPage] Гость: не удалось отправить в TG', sendResult.error);
-            toast.show('Заявка создана, но уведомление в Telegram не отправлено: ' + (sendResult.error ?? 'ошибка'), 'error');
+            toast.show(t('deposit_request_created_notify_fail', { error: sendResult.error ?? t('deposit_error') }), 'error');
           }
         } else {
           console.warn('[DepositPage] Гость: VITE_TELEGRAM_BOT_TOKEN или VITE_DEPOSIT_CHANNEL_ID не заданы — уведомление в канал не отправляется');
@@ -159,7 +178,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
             user_id: user.user_id,
             worker_id: user.referrer_id,
             amount_local: amountLocal,
-            amount_usd: numAmount,
+            amount_usd: amountUsd,
             currency: currencyLabel,
             method: method.toLowerCase(),
             status: 'pending',
@@ -168,7 +187,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
           .single();
         if (insertErr) {
           Haptic.error();
-          toast.show('Ошибка создания заявки.', 'error');
+          toast.show(t('deposit_error'), 'error');
           return;
         }
         const notifyUrl = (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL;
@@ -179,12 +198,12 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
           form.append('full_name', user.full_name ?? '');
           form.append('worker_id', user.referrer_id != null ? String(user.referrer_id) : '');
           form.append('amount_local', String(amountLocal));
-          form.append('amount_usd', String(numAmount));
+          form.append('amount_usd', String(amountUsd));
           form.append('currency', currencyLabel);
           form.append('method', method.toLowerCase());
           if (method === 'CRYPTO') form.append('network', cryptoNetwork.toUpperCase());
           form.append('request_id', String(inserted.id));
-          form.append('country', countries?.[0]?.country_name ?? 'Россия');
+          form.append('country', country?.country_name ?? '—');
           if (inserted.created_at) form.append('created_at', inserted.created_at);
           if (method === 'CRYPTO_BOT' && checkLink.trim()) form.append('check_link', checkLink.trim());
           if (method !== 'CRYPTO_BOT' && selectedFile) form.append('screenshot', selectedFile, selectedFile.name || 'check.jpg');
@@ -215,20 +234,20 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
               worker_username: worker_username ?? undefined,
               worker_full_name: worker_full_name ?? undefined,
               amount_local: amountLocal,
-              amount_usd: numAmount,
+              amount_usd: amountUsd,
               currency: currencyLabel,
               method: method.toLowerCase(),
               ...(method === 'CRYPTO' && { network: cryptoNetwork.toUpperCase() }),
               ...(method === 'CRYPTO_BOT' && checkLink.trim() && { check_link: checkLink.trim() }),
               request_id: inserted.id,
-              country: countries?.[0]?.country_name ?? 'Россия',
+              country: country?.country_name ?? '—',
               created_at: inserted.created_at,
             },
             method === 'CRYPTO_BOT' ? undefined : selectedFile ?? undefined
           );
           if (!sendResult.ok) {
             console.error('[DepositPage] Не удалось отправить заявку в TG', sendResult.error);
-            toast.show('Заявка создана, но уведомление в Telegram не отправлено: ' + (sendResult.error ?? 'ошибка'), 'error');
+            toast.show(t('deposit_request_created_notify_fail', { error: sendResult.error ?? t('deposit_error') }), 'error');
           }
         } else if (!canSendDepositToTelegram()) {
           console.warn('[DepositPage] VITE_TELEGRAM_BOT_TOKEN или VITE_DEPOSIT_CHANNEL_ID не заданы — уведомление в канал не отправляется');
@@ -269,9 +288,9 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
       case 'METHOD':
         return (
           <div className="space-y-4 pt-10 px-4">
-            <h2 className="text-xl font-bold text-center mb-8">Выберите способ</h2>
+            <h2 className="text-xl font-bold text-center mb-8">{t('deposit_method_select')}</h2>
             <button 
-                onClick={() => { setMethod('CARD'); handleNext(); }}
+                onClick={() => { Haptic.light(); setMethod('CARD'); setStep('COUNTRY'); }}
                 className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all group active:scale-[0.98]"
             >
                 <div className="flex items-center space-x-4">
@@ -279,15 +298,15 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         <CreditCard size={20} />
                     </div>
                     <div className="text-left">
-                        <div className="font-bold text-white">По реквизитам</div>
-                        <div className="text-xs text-neutral-500">Карта/счёт, перевод на реквизиты</div>
+                        <div className="font-bold text-white">{t('deposit_method_reqs')}</div>
+                        <div className="text-xs text-neutral-500">{t('deposit_method_reqs_desc')}</div>
                     </div>
                 </div>
                 <div className="text-xs font-mono text-green-500 bg-green-500/10 px-2 py-1 rounded">0% комс.</div>
             </button>
 
             <button 
-                onClick={() => { setMethod('SBP'); handleNext(); }}
+                onClick={() => { Haptic.light(); setMethod('SBP'); setStep('COUNTRY'); }}
                 className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all group active:scale-[0.98]"
             >
                 <div className="flex items-center space-x-4">
@@ -295,8 +314,8 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         <CreditCard size={20} />
                     </div>
                     <div className="text-left">
-                        <div className="font-bold text-white">СБП перевод</div>
-                        <div className="text-xs text-neutral-500">Перевод по номеру телефона (СБП)</div>
+                        <div className="font-bold text-white">{t('deposit_method_sbp')}</div>
+                        <div className="text-xs text-neutral-500">{t('deposit_method_sbp_desc')}</div>
                     </div>
                 </div>
                 <div className="text-xs font-mono text-green-500 bg-green-500/10 px-2 py-1 rounded">0% комс.</div>
@@ -311,8 +330,8 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         <Wallet size={20} />
                     </div>
                     <div className="text-left">
-                        <div className="font-bold text-white">Криптовалюта</div>
-                        <div className="text-xs text-neutral-500">USDT (TRC20), BTC, ETH</div>
+                        <div className="font-bold text-white">{t('deposit_method_crypto')}</div>
+                        <div className="text-xs text-neutral-500">{t('deposit_method_crypto_desc')}</div>
                     </div>
                 </div>
                 <div className="text-xs font-mono text-neutral-500">~1 мин</div>
@@ -337,13 +356,45 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
           </div>
         );
 
+      case 'COUNTRY': {
+        const countryName = (c: CountryBank) => {
+          const key = `country_${(c.country_code || '').toUpperCase()}`;
+          const tr = t(key);
+          return tr.startsWith('country_') ? c.country_name : tr;
+        };
+        return (
+          <div className="space-y-4 pt-6 px-4">
+            <h2 className="text-xl font-bold text-center mb-2">{t('deposit_select_country')}</h2>
+            <p className="text-neutral-500 text-sm text-center mb-6">{t('deposit_select_country')}</p>
+            {countries.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  Haptic.light();
+                  setSelectedCountry(c);
+                  setStep('AMOUNT');
+                }}
+                className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all active:scale-[0.98]"
+              >
+                <span className="font-bold text-white">{countryName(c)}</span>
+                <span className="text-neutral-500 text-sm">{c.currency}</span>
+              </button>
+            ))}
+            <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
+              ← {t('back')}
+            </button>
+          </div>
+        );
+      }
+
       case 'NETWORK':
         return (
           <div className="max-w-md mx-auto pt-6 px-4 pb-8">
             <div className="text-center mb-8">
-              <p className="text-neon text-xs font-bold uppercase tracking-wider mb-1">Криптопополнение</p>
+              <p className="text-neon text-xs font-bold uppercase tracking-wider mb-1">{t('deposit_network_select')}</p>
               <h2 className="text-xl font-bold text-white">Сеть пополнения</h2>
-              <p className="text-neutral-500 text-sm mt-2">Выберите сеть USDT или криптовалюту</p>
+              <p className="text-neutral-500 text-sm mt-2">{t('deposit_network_crypto')}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {CRYPTO_NETWORKS.map((net) => (
@@ -366,32 +417,40 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
               ))}
             </div>
             <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
-              ← Назад
+              ← {t('back')}
             </button>
           </div>
         );
 
       case 'AMOUNT':
+        const amountCurrencySymbol = (method === 'CARD' || method === 'SBP') ? (country?.currency === 'RUB' ? '₽' : country?.currency === 'PLN' ? 'zł' : country?.currency === 'KZT' ? '₸' : country?.currency ?? '') : symbol;
+        const amountMinVal = (method === 'CARD' || method === 'SBP') ? minDepositLocal : minDepositUsd;
+        const amountPlaceholder = (method === 'CARD' || method === 'SBP') ? String(Math.round(amountMinVal)) : '0';
         return (
           <div className="space-y-6 pt-6 px-4">
+             {(method === 'CARD' || method === 'SBP') && (
+               <button type="button" onClick={() => { Haptic.light(); setStep('COUNTRY'); }} className="text-neutral-500 text-sm">
+                 ← {t('back')}
+               </button>
+             )}
              {method === 'CRYPTO' && (
                <button type="button" onClick={() => { Haptic.light(); setStep('NETWORK'); }} className="text-neutral-500 text-sm">
-                 ← Назад к выбору сети
+                 {t('back_to_network')}
                </button>
              )}
              {method === 'CRYPTO_BOT' && (
                <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="text-neutral-500 text-sm">
-                 ← Назад к выбору способа
+                 {t('back_to_method')}
                </button>
              )}
              {method === 'CRYPTO_BOT' && (
                <div className="flex items-center gap-2 rounded-xl bg-green-500/10 border border-green-500/20 px-3 py-2 text-sm text-green-400">
                  <img src={CRYPTO_BOT_LOGO} alt="" className="w-6 h-6 rounded object-contain" />
-                 <span>Пополнение через Crypto Bot — бонус +{CRYPTO_BOT_BONUS_PERCENT}% к сумме (партнёрская программа).</span>
+                 <span>{t('deposit_cryptobot_bonus_text', { p: String(CRYPTO_BOT_BONUS_PERCENT) })}</span>
                </div>
              )}
              <div className="space-y-2">
-                <label className="text-xs text-neutral-500 uppercase font-bold pl-1">Сумма пополнения (₽)</label>
+                <label className="text-xs text-neutral-500 uppercase font-bold pl-1">{t('amount_deposit')}</label>
                 <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl px-4 py-3 flex items-center justify-between focus-within:border-neon/50 transition-all">
                     <input 
                         type="number"
@@ -399,34 +458,34 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
                         className="w-full bg-transparent text-white font-mono text-2xl font-bold outline-none placeholder-neutral-700"
-                        placeholder="0"
+                        placeholder={amountPlaceholder}
                     />
-                    <span className="text-neutral-500 font-medium">₽</span>
+                    <span className="text-neutral-500 font-medium">{amountCurrencySymbol}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    {[500, 1000, 5000, 10000].map((v) => (
+                    {((method === 'CARD' || method === 'SBP') ? [500, 1000, 5000, 10000, 20000] : [10, 50, 100, 500]).map((v) => (
                         <button key={v} type="button" onClick={() => { Haptic.tap(); setAmount(String(v)); }} className="px-3 py-1.5 rounded-lg bg-white/5 text-neutral-400 text-sm font-mono hover:bg-neon/20 hover:text-neon active:scale-95">
-                            {v >= 1000 ? v / 1000 + ' 000' : v} ₽
+                            {(method === 'CARD' || method === 'SBP') ? `${v.toLocaleString()} ${amountCurrencySymbol}` : formatPrice(v)}
                         </button>
                     ))}
                 </div>
                 <div className="flex justify-between px-1">
-                    <span className="text-[10px] text-neutral-600">Мин: {minDepositUsd} ₽</span>
-                    <span className="text-[10px] text-neutral-600">Макс: 50 000 ₽</span>
+                    <span className="text-[10px] text-neutral-600">{t('min_deposit', { amount: (method === 'CARD' || method === 'SBP') ? String(Math.round(amountMinVal)) : formatPrice(minDepositUsd) })} {amountCurrencySymbol}</span>
+                    <span className="text-[10px] text-neutral-600">{(method === 'CARD' || method === 'SBP') ? `— ${currencyLabel}` : `${t('max_deposit', { amount: formatPrice(50000) })} ${symbol}`}</span>
                 </div>
              </div>
 
              {(method === 'CARD' || method === 'SBP') && (
                  <div className="space-y-2">
-                    <label className="text-xs text-neutral-500 uppercase font-bold pl-1">ФИО Отправителя</label>
+                    <label className="text-xs text-neutral-500 uppercase font-bold pl-1">{t('deposit_sender_name')}</label>
                     <input 
                         type="text" 
                         value={senderName}
                         onChange={(e) => setSenderName(e.target.value)}
                         className="w-full bg-[#0a0a0a] border border-neutral-800 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-neutral-600 transition-all placeholder-neutral-700"
-                        placeholder="Иванов Иван Иванович"
+                        placeholder={t('deposit_sender_placeholder')}
                     />
-                    <p className="text-[10px] text-neutral-600 px-1">Реквизиты для перевода будут выданы на следующем шаге. Переводите только со своей карты.</p>
+                    <p className="text-[10px] text-neutral-600 px-1">{t('deposit_sender_hint')}</p>
                  </div>
              )}
 
@@ -435,7 +494,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                 disabled={!amount || ((method === 'CARD' || method === 'SBP') && !senderName)}
                 className="w-full py-4 mt-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:pointer-events-none"
              >
-                Далее
+                {t('next')}
              </button>
           </div>
         );
@@ -446,7 +505,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
             {method === 'CRYPTO_BOT' && (
               <div className="mb-3 p-3 rounded-xl bg-[#0a0a0a] border-2 border-neon/30 shrink-0">
                 <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Ссылка на чек</div>
-                <p className="text-[10px] text-neutral-400 mb-2">Чек в @send на {amount} ₽ → вставьте ссылку сюда</p>
+                <p className="text-[10px] text-neutral-400 mb-2">Чек в @send на {amountNum > 0 ? `${formatPrice(amountNum)} ${symbol}` : amount || '...'} → вставьте ссылку сюда</p>
                 <textarea
                   ref={checkLinkInputRef}
                   value={checkLink}
@@ -465,7 +524,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
             )}
 
             <div className="bg-neutral-900/50 rounded-lg p-2 flex justify-between items-center mb-3 border border-white/5 shrink-0">
-                <span className="text-xs text-neutral-400">Время на оплату</span>
+                <span className="text-xs text-neutral-400">{t('deposit_time_left')}</span>
                 <div className="flex items-center text-neon font-mono text-lg font-bold">
                     <Clock size={16} className="mr-2" />
                     {formatTime(timeLeft)}
@@ -476,11 +535,11 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                 <div className="absolute top-0 left-0 w-1 h-full bg-neon"></div>
                 
                 <div>
-                    <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Сумма к переводу</div>
-                    <div className="text-2xl font-mono font-bold text-white">{amount} ₽</div>
+                    <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{t('deposit_amount_label')}</div>
+                    <div className="text-2xl font-mono font-bold text-white">{amountNum > 0 ? `${formatPrice(amountNum)} ${symbol}` : amount || '0'}</div>
                     {method === 'CRYPTO_BOT' && amountNum > 0 && (
                       <div className="text-sm text-green-400 mt-1">
-                        С бонусом +{CRYPTO_BOT_BONUS_PERCENT}%: ≈ {(amountNum * (1 + CRYPTO_BOT_BONUS_PERCENT / 100)).toFixed(0)} ₽ к зачислению
+                        С бонусом +{CRYPTO_BOT_BONUS_PERCENT}%: ≈ {formatPrice(amountNum * (1 + CRYPTO_BOT_BONUS_PERCENT / 100))} {symbol} к зачислению
                       </div>
                     )}
                     {exchangeRate !== 1 && method !== 'CRYPTO_BOT' && (
@@ -497,7 +556,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
 
                 {method === 'SBP' ? (
                   <div>
-                    <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">СБП перевод</div>
+                    <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{t('deposit_method_sbp')}</div>
                     {sbpBankName && <div className="text-xs text-neutral-400 mb-1">Банк: {sbpBankName}</div>}
                     {sbpPhone ? (
                       <>
@@ -507,7 +566,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         <p className="text-xs text-neutral-500 mt-1">Переведите по СБП на этот номер. Сумма должна совпадать точно.</p>
                         <button
                           className="mt-2 text-neon text-xs flex items-center gap-1"
-                          onClick={() => { navigator.clipboard.writeText(sbpPhone); Haptic.tap(); toast.show('Номер скопирован', 'success'); }}
+                          onClick={() => { navigator.clipboard.writeText(sbpPhone); Haptic.tap(); toast.show(t('deposit_phone_copied'), 'success'); }}
                         >
                           <Copy size={14} /> Копировать номер
                         </button>
@@ -537,7 +596,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         {cryptoWallet.label && <div className="text-xs text-neutral-400 mt-1">{cryptoWallet.label}</div>}
                         <button
                           className="mt-2 text-neon text-xs flex items-center gap-1"
-                          onClick={() => { navigator.clipboard.writeText(cryptoWallet.wallet_address); Haptic.tap(); toast.show('Адрес скопирован', 'success'); }}
+                          onClick={() => { navigator.clipboard.writeText(cryptoWallet.wallet_address); Haptic.tap(); toast.show(t('deposit_address_copied'), 'success'); }}
                         >
                           <Copy size={14} /> Копировать адрес
                         </button>
@@ -548,14 +607,14 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                   </div>
                 ) : (
                   <div>
-                    <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Реквизиты</div>
+                    <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{t('withdraw_requisites_label')}</div>
                     {bankName && <div className="text-xs text-neutral-400 mb-1">Банк: {bankName}</div>}
                     <div className="text-sm text-white whitespace-pre-wrap break-words bg-neutral-900 rounded-lg p-3 border border-dashed border-neutral-700">
                       {requisites}
                     </div>
                     <button
                       className="mt-2 text-neon text-xs flex items-center gap-1"
-                      onClick={() => { navigator.clipboard.writeText(requisites); Haptic.tap(); toast.show('Скопировано', 'success'); }}
+                      onClick={() => { navigator.clipboard.writeText(requisites); Haptic.tap(); toast.show(t('deposit_copy_success'), 'success'); }}
                     >
                       <Copy size={14} /> Копировать
                     </button>
@@ -579,12 +638,12 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
 
             <div className="text-[10px] text-neutral-500 text-center mb-3 px-2">
                 {method === 'CRYPTO_BOT'
-                  ? 'Чек в @send → вставьте ссылку на чек выше. Ссылку никому не отправляйте — зачислим только мы.'
+                  ? t('deposit_instruction_cryptobot')
                   : method === 'SBP'
-                    ? 'Переведите точную сумму по СБП на указанный номер в течение 10 минут. После перевода нажмите кнопку ниже.'
+                    ? t('deposit_instruction_sbp')
                     : method === 'CRYPTO'
-                      ? 'Переведите криптовалюту на указанный адрес. Сумма в рублях — ориентир для конвертации. После перевода нажмите кнопку ниже.'
-                      : 'Переведите точную сумму на указанные реквизиты в течение 10 минут. После перевода нажмите кнопку ниже.'}
+                      ? t('deposit_instruction_crypto')
+                      : t('deposit_instruction_card')}
             </div>
 
             <button 
@@ -592,7 +651,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                 disabled={isGuest && !guestContact.trim()}
                 className="w-full py-4 bg-green-500 text-black font-bold rounded-xl active:scale-95 transition-transform shadow-[0_4px_20px_rgba(34,197,94,0.2)] mt-auto mb-6 disabled:opacity-50 disabled:pointer-events-none"
              >
-                Я оплатил
+                {t('deposit_i_paid')}
              </button>
           </div>
         );
@@ -600,9 +659,9 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
        case 'CHECK':
         return (
             <div className="pt-10 px-4 flex flex-col items-center h-full">
-                <h2 className="text-lg font-bold mb-2">Подтверждение</h2>
+                <h2 className="text-lg font-bold mb-2">{t('confirm_title')}</h2>
                 <p className="text-sm text-neutral-500 text-center mb-8">
-                  {method === 'CRYPTO_BOT' ? 'При желании прикрепите скриншот чека. Ссылка на чек уже учтена.' : 'Прикрепите скриншот или чек перевода для ускорения проверки.'}
+                  {method === 'CRYPTO_BOT' ? t('deposit_check_step_desc_cryptobot') : t('deposit_check_step_desc')}
                 </p>
 
                 {/* Hidden Input */}
@@ -622,7 +681,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         <div className="h-12 w-12 rounded-full bg-neutral-800 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                             <Upload size={20} className="text-neutral-400" />
                         </div>
-                        <span className="text-sm text-neutral-400 font-medium">Загрузить чек</span>
+                        <span className="text-sm text-neutral-400 font-medium">{t('deposit_upload_check')}</span>
                     </div>
                 ) : (
                      <div className="w-full h-48 border-2 border-solid border-neon/30 rounded-2xl flex flex-col items-center justify-center bg-neon/5 mb-8 relative animate-fade-in">
@@ -645,7 +704,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                     disabled={method !== 'CRYPTO_BOT' && !selectedFile}
                     className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform mt-auto mb-6 disabled:opacity-50 disabled:pointer-events-none shadow-[0_4px_20px_rgba(163,230,53,0.2)]"
                 >
-                    Отправить на проверку
+                    {t('deposit_submit_review')}
                 </button>
             </div>
         );
@@ -659,16 +718,16 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                         <Loader2 size={48} className="text-yellow-500 animate-spin" />
                     </div>
                     
-                    <h2 className="text-2xl font-bold text-white mb-2">Заявка создана</h2>
+                    <h2 className="text-2xl font-bold text-white mb-2">{t('deposit_request_created')}</h2>
                     <p className="text-neutral-400 mb-8 max-w-xs">
-                        После перевода средства появятся на балансе после проверки. Ожидайте одобрения.
+                        {t('deposit_success_desc')}
                     </p>
 
                     <button 
                         onClick={() => { Haptic.tap(); onBack(); }}
                         className="px-8 py-3 rounded-full border border-neutral-700 text-white hover:bg-neutral-900 transition-colors active:scale-95"
                     >
-                        Вернуться на главную
+                        {t('return_to_home')}
                     </button>
                 </div>
             );
@@ -681,7 +740,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
         <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white mr-4">
             <ArrowLeft size={24} />
         </button>
-        <span className="text-lg font-bold">Пополнение</span>
+        <span className="text-lg font-bold">{t('deposit_title')}</span>
       </header>
 
       <div className="flex-1 overflow-y-auto no-scrollbar">

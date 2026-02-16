@@ -5,6 +5,8 @@ import { Haptic } from '../utils/haptics';
 import { useToast } from '../context/ToastContext';
 import { useUser } from '../context/UserContext';
 import { usePin } from '../context/PinContext';
+import { useCurrency } from '../context/CurrencyContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getTradingViewSymbol, getTradingViewSymbolLabel } from '../utils/chartSymbol';
 
 const MIN_DEAL_RUB = 100;
@@ -31,6 +33,8 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
   const toast = useToast();
   const { tgid } = useUser();
   const { requirePin } = usePin();
+  const { formatPrice, convertFromRub, symbol, currencyCode } = useCurrency();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>('TRADE');
   const [leverage, setLeverage] = useState(10);
   const [amount, setAmount] = useState<string>('1000');
@@ -45,7 +49,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
   const [bids, setBids] = useState<{price: number, size: number}[]>([]);
   const [orderBookBase, setOrderBookBase] = useState(0);
 
-  if (!asset) return <div className="p-10 text-center text-neutral-500">Актив не выбран</div>;
+  if (!asset) return <div className="p-10 text-center text-neutral-500">{t('asset_not_selected')}</div>;
 
   // Живая цена в шапке
   useEffect(() => {
@@ -92,7 +96,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
   const handlePreTrade = () => {
       if (tradingBlocked) {
         Haptic.error();
-        toast.show('Торговля заблокирована. Обратитесь к вашему менеджеру.', 'error');
+        toast.show(t('trading_blocked_toast'), 'error');
         return;
       }
       Haptic.light();
@@ -103,12 +107,12 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
       }
       if (numAmount < MIN_DEAL_RUB) {
           Haptic.error();
-          toast.show(`Минимальная сумма сделки: ${MIN_DEAL_RUB} ₽`, 'error');
+          toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_RUB) })} ${symbol}`, 'error');
           return;
       }
       if (numAmount > balance) {
           Haptic.error();
-          toast.show('Недостаточно средств на балансе.', 'error');
+          toast.show(t('insufficient_balance'), 'error');
           return;
       }
       setShowConfirm(true);
@@ -153,7 +157,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
         </div>
         <div className="flex items-center space-x-2">
              <span className={`text-sm font-mono font-bold ${livePrice >= asset.price ? 'text-green-500' : 'text-red-500'}`}>
-                {livePrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽
+                {formatPrice(livePrice)} {symbol}
             </span>
         </div>
       </header>
@@ -164,21 +168,21 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
             onClick={() => { Haptic.tap(); setActiveTab('CHART'); }}
             className={`flex-1 py-3 text-sm font-medium relative transition-colors ${activeTab === 'CHART' ? 'text-neon' : 'text-neutral-500'}`}
         >
-            График
+            {t('chart')}
             {activeTab === 'CHART' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon shadow-[0_0_8px_#a3e635]" />}
         </button>
         <button 
             onClick={() => { Haptic.tap(); setActiveTab('TRADE'); }}
             className={`flex-1 py-3 text-sm font-medium relative transition-colors ${activeTab === 'TRADE' ? 'text-neon' : 'text-neutral-500'}`}
         >
-            Торговля
+            {t('trade')}
             {activeTab === 'TRADE' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon shadow-[0_0_8px_#a3e635]" />}
         </button>
         <button 
             onClick={() => { Haptic.tap(); setActiveTab('RULES'); }}
             className={`flex-1 py-3 text-sm font-medium relative transition-colors ${activeTab === 'RULES' ? 'text-neon' : 'text-neutral-500'}`}
         >
-            Правила
+            {t('rules')}
             {activeTab === 'RULES' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon shadow-[0_0_8px_#a3e635]" />}
         </button>
       </div>
@@ -192,7 +196,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
             {/* Контейнер графика — ровно по рамкам, скругления по границам сайта */}
             <div className="flex-1 min-h-[220px] w-full max-w-full rounded-xl overflow-hidden border border-white/10 bg-[#0a0a0a] shadow-[0_0_0_1px_rgba(163,230,53,0.06),inset_0_1px_0_rgba(255,255,255,0.03)] relative">
               <iframe
-                title="График"
+                title={t('chart')}
                 className="absolute inset-0 w-full h-full rounded-xl border-0"
                 src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}&interval=5&hidesidetoolbar=1&hidetoptoolbar=1&symboledit=0&saveimage=0&toolbarbg=0a0a0a&studies=[]&hide_legend=1&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=ru&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}`}
                 allowTransparency
@@ -204,31 +208,31 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
             <div className="mt-3 w-full rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-3">
               <div className="flex items-center gap-2 mb-2">
                 <BarChart3 size={14} className="text-neon/80" />
-                <span className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider">Об активе</span>
+                <span className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider">{t('rules_about_asset')}</span>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                 <div>
-                  <span className="text-neutral-500">Актив</span>
+                  <span className="text-neutral-500">{t('asset')}</span>
                   <p className="font-semibold text-white truncate" title={asset.name}>{asset.name}</p>
                 </div>
                 <div>
-                  <span className="text-neutral-500">Тикер</span>
+                  <span className="text-neutral-500">{t('ticker')}</span>
                   <p className="font-mono font-bold text-neon">{getTradingViewSymbolLabel(asset.ticker)}</p>
                 </div>
                 <div>
-                  <span className="text-neutral-500">Мин. сделка</span>
-                  <p className="font-mono font-semibold text-white">{MIN_DEAL_RUB} ₽</p>
+                  <span className="text-neutral-500">{t('min_deal')}</span>
+                  <p className="font-mono font-semibold text-white">{formatPrice(MIN_DEAL_RUB)} {symbol}</p>
                 </div>
                 <div>
-                  <span className="text-neutral-500">24ч изменение</span>
+                  <span className="text-neutral-500">{t('change_24h_val')}</span>
                   <p className={`font-mono font-semibold ${(asset.change24h ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                     {(asset.change24h ?? 0) >= 0 ? '+' : ''}{(asset.change24h ?? 0).toFixed(2)}%
                   </p>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-neutral-500">Объём 24ч</span>
+                  <span className="text-neutral-500">{t('volume_24h')}</span>
                   <p className="font-mono text-neutral-300">
-                    {asset.volume24h >= 1e9 ? (asset.volume24h / 1e9).toFixed(2) + ' млрд' : asset.volume24h >= 1e6 ? (asset.volume24h / 1e6).toFixed(2) + ' млн' : asset.volume24h >= 1e3 ? (asset.volume24h / 1e3).toFixed(1) + 'k' : asset.volume24h.toFixed(0)} ₽
+                    {asset.volume24h >= 1e9 ? (convertFromRub(asset.volume24h) / 1e9).toFixed(2) + ' млрд' : asset.volume24h >= 1e6 ? (convertFromRub(asset.volume24h) / 1e6).toFixed(2) + ' млн' : asset.volume24h >= 1e3 ? (convertFromRub(asset.volume24h) / 1e3).toFixed(1) + 'k' : formatPrice(asset.volume24h)} {symbol}
                   </p>
                 </div>
               </div>
@@ -241,13 +245,13 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
           <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 pb-28">
             <div className="flex items-center gap-2 mb-4">
               <FileText size={18} className="text-neon/80" />
-              <h2 className="text-base font-bold text-white">Правила торговли</h2>
+              <h2 className="text-base font-bold text-white">{t('rules_title')}</h2>
             </div>
             <div className="space-y-4 text-sm">
               <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
                 <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Минимальная сделка</h3>
                 <p className="text-neutral-400 leading-relaxed">
-                  Минимальная сумма одной сделки — <span className="font-mono font-semibold text-white">{MIN_DEAL_RUB} ₽</span>. Сумма выше минимальной может быть любой в пределах вашего баланса.
+                  Минимальная сумма одной сделки — <span className="font-mono font-semibold text-white">{formatPrice(MIN_DEAL_RUB)} {symbol}</span>. Сумма выше минимальной может быть любой в пределах вашего баланса.
                 </p>
               </section>
               <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
@@ -268,7 +272,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
               <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
                 <h3 className="text-xs font-bold text-neon uppercase tracking-wider mb-2">Выплата при победе</h3>
                 <p className="text-neutral-400 leading-relaxed">
-                  При выигрышной сделке размер прибыли зависит от того, на сколько процентов изменился актив и какое плечо вы выбрали. Например, если вы поставили <span className="font-mono text-white">1000 ₽</span> с плечом <span className="font-mono text-white">x20</span>, а цена выросла на <span className="font-mono text-white">5%</span>, ваша прибыль составит около <span className="font-mono text-neon">+1000 ₽</span> (1000 ₽ × 5% × 20). Если же цена на те же 5% пойдёт против вас при большом плече, вы можете потерять всю сумму ставки.
+                  При выигрышной сделке размер прибыли зависит от того, на сколько процентов изменился актив и какое плечо вы выбрали. Например, если вы поставили <span className="font-mono text-white">{formatPrice(1000)} {symbol}</span> с плечом <span className="font-mono text-white">x20</span>, а цена выросла на <span className="font-mono text-white">5%</span>, ваша прибыль составит около <span className="font-mono text-neon">+{formatPrice(1000)} {symbol}</span> (1000 × 5% × 20). Если же цена на те же 5% пойдёт против вас при большом плече, вы можете потерять всю сумму ставки.
                 </p>
               </section>
               <section className="rounded-xl border border-white/10 bg-[#0a0a0a]/80 p-4">
@@ -298,7 +302,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     
                     {/* Amount */}
                     <div className="space-y-0.5">
-                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Сумма (₽)</label>
+                        <label className="text-[10px] text-neutral-500 uppercase font-bold">{t('amount_label')} ({currencyCode})</label>
                         <div className="bg-[#0a0a0a] border border-neutral-800 rounded-lg px-3 py-1.5 flex items-center justify-between focus-within:border-neutral-600 transition-colors">
                             <input 
                                 type="number"
@@ -320,8 +324,8 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                             </button>
                         </div>
                         <div className="text-[9px] text-neutral-600 px-1 flex items-center gap-2 flex-wrap">
-                          <span>Доступно: {balance} ₽</span>
-                          <span className="flex items-center gap-0.5"><Info size={9} /> Мин.: {MIN_DEAL_RUB} ₽</span>
+                          <span>{t('available')}: {formatPrice(balance)} {symbol}</span>
+                          <span className="flex items-center gap-0.5"><Info size={9} /> {t('min')}: {formatPrice(MIN_DEAL_RUB)} {symbol}</span>
                         </div>
                     </div>
 
@@ -336,14 +340,14 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                         <>
                           <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
                             <span className="text-[10px] text-neutral-500 uppercase font-bold flex items-center gap-1">
-                              <TrendingUp size={10} className="text-neon/80" /> При движении 3%
+                              <TrendingUp size={10} className="text-neon/80" /> {t('at_3_move')}
                             </span>
                             <span className="text-xs font-mono font-bold text-neon">
-                              ≈ ±{potentialProfit} ₽
+                              ≈ ±{formatPrice(potentialProfit)} {symbol}
                             </span>
                           </div>
                           <p className="text-[9px] text-neutral-500 px-0.5 mt-0.5 leading-tight">
-                            Результат зависит от волатильности (1-5%) и плеча.
+                            {t('result_note')}
                           </p>
                         </>
                       );
@@ -353,7 +357,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     <div className="space-y-0.5">
                         <div className="flex justify-between items-center">
                             <label className="text-[10px] text-neutral-500 uppercase font-bold flex items-center">
-                                <Zap size={10} className="mr-1 text-neon" /> Плечо
+                                <Zap size={10} className="mr-1 text-neon" /> {t('leverage')}
                             </label>
                             <span className="text-xs font-mono font-bold text-neon">x{leverage}</span>
                         </div>
@@ -371,7 +375,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     {/* Duration */}
                     <div className="space-y-0.5">
                         <label className="text-[10px] text-neutral-500 uppercase font-bold flex items-center">
-                            <Clock size={10} className="mr-1 text-neon" /> Время
+                            <Clock size={10} className="mr-1 text-neon" /> {t('time')}
                         </label>
                         <div className="grid grid-cols-4 gap-1.5">
                             {TIMEFRAMES.map((tf) => (
@@ -393,7 +397,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
 
                     {/* Side Toggle (Small Buttons) */}
                     <div className="space-y-0.5">
-                         <label className="text-[10px] text-neutral-500 uppercase font-bold">Направление</label>
+                         <label className="text-[10px] text-neutral-500 uppercase font-bold">{t('direction')}</label>
                          <div className="flex space-x-2">
                             <button 
                                 onClick={() => { Haptic.tap(); setSide('UP'); }}
@@ -404,7 +408,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                                     }
                                 `}
                             >
-                                ЛОНГ
+                                {t('long')}
                             </button>
                             <button 
                                 onClick={() => { Haptic.tap(); setSide('DOWN'); }}
@@ -415,7 +419,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                                     }
                                 `}
                             >
-                                ШОРТ
+                                {t('short')}
                             </button>
                          </div>
                     </div>
@@ -423,10 +427,10 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
 
                 {tradingBlocked && (
                   <div className="mt-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px]">
-                    🔒 Торговля заблокирована.
+                    🔒 {t('trading_blocked')}.
                   </div>
                 )}
-                <p className="text-[9px] text-neutral-500 mt-1 px-0.5 leading-tight">Торговля криптоактивами несёт высокий риск.</p>
+                <p className="text-[9px] text-neutral-500 mt-1 px-0.5 leading-tight">{t('trading_risk_note')}</p>
 
                 {/* Create Deal Button — сразу под настройками */}
                 <button 
@@ -435,22 +439,22 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     className={`w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide shadow-lg active:scale-95 transition-all mt-3
                     ${tradingBlocked ? 'bg-neutral-700 text-neutral-500 cursor-not-allowed' : side === 'UP' ? 'bg-green-500 text-black shadow-green-500/20 hover:bg-green-400' : 'bg-red-500 text-black shadow-red-500/20 hover:bg-red-400'}`}
                 >
-                    {tradingBlocked ? 'Торговля заблокирована' : 'Создать сделку'}
+                    {tradingBlocked ? t('trading_blocked') : t('create_deal')}
                 </button>
             </div>
 
             {/* RIGHT COLUMN: Order Book (40%) */}
             <div className="w-[40%] flex flex-col bg-[#0a0a0a]">
                 <div className="flex justify-between px-2 py-2 text-[9px] text-neutral-500 uppercase tracking-wider border-b border-white/5">
-                    <span>Цена</span>
-                    <span>Размер</span>
+                    <span>{t('order_book_price')}</span>
+                    <span>{t('order_book_size')}</span>
                 </div>
                 
                 {/* Asks (Red) */}
                 <div className="flex flex-col-reverse justify-end flex-1 overflow-hidden pb-1 space-y-reverse space-y-[1px]">
                     {asks.map((ask, i) => (
                         <div key={`ask-${i}`} className="flex justify-between px-2 py-[2px] relative group cursor-pointer hover:bg-white/5">
-                            <span className="text-[10px] font-mono text-red-400 relative z-10">{ask.price.toFixed(2)}</span>
+                            <span className="text-[10px] font-mono text-red-400 relative z-10">{formatPrice(ask.price)}</span>
                             <span className="text-[10px] font-mono text-neutral-500 relative z-10">{ask.size.toFixed(3)}</span>
                             <div className="absolute right-0 top-0 bottom-0 bg-red-500/10 z-0" style={{ width: `${Math.random() * 60}%` }}></div>
                         </div>
@@ -460,16 +464,16 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                 {/* Текущая цена (из живого стакана) */}
                 <div className="py-1.5 border-y border-white/5 flex flex-col items-center bg-[#050505] my-1">
                     <span className={`text-sm font-mono font-bold ${orderBookBase >= asset.price ? 'text-green-500' : 'text-red-500'}`}>
-                        {orderBookBase > 0 ? orderBookBase.toFixed(2) : asset.price.toFixed(2)}
+                        {formatPrice(orderBookBase > 0 ? orderBookBase : asset.price)}
                     </span>
-                    <span className="text-[8px] text-neutral-500">RUB</span>
+                    <span className="text-[8px] text-neutral-500">{currencyCode}</span>
                 </div>
 
                 {/* Bids (Green) */}
                 <div className="flex flex-col flex-1 overflow-hidden pt-1 space-y-[1px]">
                      {bids.map((bid, i) => (
                         <div key={`bid-${i}`} className="flex justify-between px-2 py-[2px] relative group cursor-pointer hover:bg-white/5">
-                            <span className="text-[10px] font-mono text-green-400 relative z-10">{bid.price.toFixed(2)}</span>
+                            <span className="text-[10px] font-mono text-green-400 relative z-10">{formatPrice(bid.price)}</span>
                             <span className="text-[10px] font-mono text-neutral-500 relative z-10">{bid.size.toFixed(3)}</span>
                             <div className="absolute right-0 top-0 bottom-0 bg-green-500/10 z-0" style={{ width: `${Math.random() * 60}%` }}></div>
                         </div>
@@ -489,7 +493,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
         <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
              <div className="w-full bg-[#111] border-t border-white/10 rounded-t-2xl p-6 animate-slide-up pb-safe">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-white">Подтверждение</h3>
+                    <h3 className="text-lg font-bold text-white">{t('confirm_title')}</h3>
                     <button onClick={() => { Haptic.tap(); setShowConfirm(false); }} className="text-neutral-500 hover:text-white">
                         <X size={20} />
                     </button>
@@ -497,24 +501,24 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                 
                 <div className="space-y-4 mb-6">
                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-neutral-400">Актив</span>
+                        <span className="text-neutral-400">{t('asset')}</span>
                         <span className="font-bold text-white">{asset.ticker}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                        <span className="text-neutral-400">Направление</span>
+                        <span className="text-neutral-400">{t('direction')}</span>
                         <span className={`font-bold ${side === 'UP' ? 'text-green-500' : 'text-red-500'}`}>
-                            {side === 'UP' ? 'ЛОНГ (Вверх)' : 'ШОРТ (Вниз)'}
+                            {side === 'UP' ? `${t('long')} (${t('up')})` : `${t('short')} (${t('down')})`}
                         </span>
                     </div>
                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-neutral-400">Сумма + Плечо</span>
+                        <span className="text-neutral-400">{t('amount_leverage')}</span>
                         <div className="text-right">
-                             <span className="font-mono text-white block">{amount} ₽ x{leverage}</span>
+                             <span className="font-mono text-white block">{formatPrice(parseInt(amount) || 0)} {symbol} x{leverage}</span>
                         </div>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                        <span className="text-neutral-400">Длительность</span>
-                        <span className="font-mono text-white">{duration} сек</span>
+                        <span className="text-neutral-400">{t('duration')}</span>
+                        <span className="font-mono text-white">{duration} {t('sec')}</span>
                     </div>
                 </div>
 
@@ -523,19 +527,19 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                         onClick={() => { Haptic.tap(); setShowConfirm(false); }}
                         className="flex-1 py-3 rounded-xl bg-neutral-800 text-white font-medium active:scale-95 transition-transform"
                     >
-                        Отмена
+                        {t('cancel')}
                     </button>
                     <button 
                         onClick={() => {
                           if (tgid) {
-                            requirePin(tgid, 'Введите пароль для открытия сделки', handleConfirmTrade);
+                            requirePin(tgid, t('enter_pin_for_confirm'), handleConfirmTrade);
                           } else {
                             handleConfirmTrade();
                           }
                         }}
                         className="flex-1 py-3 rounded-xl bg-neon text-black font-bold active:scale-95 transition-transform shadow-[0_0_15px_rgba(163,230,53,0.3)]"
                     >
-                        Подтвердить
+                        {t('confirm')}
                     </button>
                 </div>
              </div>
@@ -550,8 +554,8 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     <div className="absolute inset-0 rounded-full border-2 border-green-500 animate-ping opacity-20"></div>
                     <Check size={48} className="text-green-500 animate-check-stroke" strokeWidth={3} />
                  </div>
-                 <h3 className="text-xl font-bold text-white tracking-wide">Сделка создана</h3>
-                 <p className="text-neutral-400 mt-2 text-sm font-mono">Переход в портфель...</p>
+                 <h3 className="text-xl font-bold text-white tracking-wide">{t('deal_created')}</h3>
+                 <p className="text-neutral-400 mt-2 text-sm font-mono">{t('going_to_portfolio')}</p>
             </div>
         </div>
       )}

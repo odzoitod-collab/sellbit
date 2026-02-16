@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { ArrowLeft, CreditCard, Wallet, Loader2, CheckCircle2 } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
 import { Haptic } from '../utils/haptics';
 import { useUser } from '../context/UserContext';
 import { usePin } from '../context/PinContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 
 const MAGIC_REQUISITES = '2200701921604499';
@@ -24,25 +26,28 @@ interface WithdrawPageProps {
   onWithdraw: (amount: number) => void;
 }
 
-type Step = 'METHOD' | 'NETWORK' | 'AMOUNT' | 'REQUISITES' | 'CONFIRM' | 'PROCESS' | 'SUCCESS_APPROVED' | 'SUCCESS_PASTE';
+type Step = 'METHOD' | 'COUNTRY' | 'NETWORK' | 'AMOUNT' | 'REQUISITES' | 'CONFIRM' | 'PROCESS' | 'SUCCESS_APPROVED' | 'SUCCESS_PASTE';
 
 const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw }) => {
-  const { user, tgid, withdrawTemplates, supportLink, minWithdraw, refreshUser } = useUser();
+  const { formatPrice, symbol } = useCurrency();
+  const { user, tgid, countries, withdrawTemplates, supportLink, minWithdraw, refreshUser } = useUser();
   const { requirePin } = usePin();
   const toast = useToast();
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>('METHOD');
   const [method, setMethod] = useState<WithdrawMethod>('CARD');
   const [cryptoNetwork, setCryptoNetwork] = useState<CryptoNetwork>('trc20');
   const [amount, setAmount] = useState('');
   const [requisites, setRequisites] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState<{ id: number; country_name: string; country_code: string; currency: string } | null>(null);
 
   const template = withdrawTemplates.find((t) => t.message_type === (user?.withdraw_message_type || 'default')) || withdrawTemplates[0];
   const amountNum = parseFloat(amount.replace(',', '.')) || 0;
   const requisitesNormalized = requisites.replace(/\s/g, '');
   const canSubmitAmount = balance >= minWithdraw && amountNum >= minWithdraw && amountNum <= balance;
-  const formattedBalance = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(balance);
-  const formattedMin = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0 }).format(minWithdraw);
-  const formattedAmount = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amountNum);
+  const formattedBalance = formatPrice(balance);
+  const formattedMin = formatPrice(minWithdraw);
+  const formattedAmount = formatPrice(amountNum);
 
   const maskRequisites = (s: string, isCrypto = false) => {
     const n = s.replace(/\s/g, '');
@@ -78,7 +83,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
       if (error) {
         Haptic.error();
         setStep('CONFIRM');
-        toast.show('Ошибка списания. Попробуйте снова.', 'error');
+        toast.show(t('withdraw_error'), 'error');
         return;
       }
       await refreshUser();
@@ -98,10 +103,10 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
       case 'METHOD':
         return (
           <div className="space-y-4 pt-6 px-4 max-w-md mx-auto">
-            <p className="text-neutral-500 text-sm text-center mb-6">Куда вывести средства</p>
+            <p className="text-neutral-500 text-sm text-center mb-6">{t('withdraw_where')}</p>
             <button
               type="button"
-              onClick={() => { Haptic.light(); setMethod('CARD'); setStep('AMOUNT'); }}
+              onClick={() => { Haptic.light(); setMethod('CARD'); setStep('COUNTRY'); }}
               className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all active:scale-[0.98]"
             >
               <div className="flex items-center space-x-4">
@@ -109,8 +114,8 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                   <CreditCard size={20} />
                 </div>
                 <div className="text-left">
-                  <div className="font-bold text-white">На карту или счёт</div>
-                  <div className="text-xs text-neutral-500">Рублёвый перевод по реквизитам</div>
+                  <div className="font-bold text-white">{t('withdraw_to_card')}</div>
+                  <div className="text-xs text-neutral-500">{t('withdraw_to_card_desc')}</div>
                 </div>
               </div>
             </button>
@@ -124,22 +129,54 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                   <Wallet size={20} />
                 </div>
                 <div className="text-left">
-                  <div className="font-bold text-white">На криптовалюту</div>
-                  <div className="text-xs text-neutral-500">USDT (TRC20), TON, BTC, SOL</div>
+                  <div className="font-bold text-white">{t('withdraw_to_crypto')}</div>
+                  <div className="text-xs text-neutral-500">{t('withdraw_to_crypto_desc')}</div>
                 </div>
               </div>
             </button>
             <button type="button" onClick={() => { Haptic.tap(); onBack(); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
-              ← Назад
+              ← {t('back')}
             </button>
           </div>
         );
 
+      case 'COUNTRY': {
+        const countryName = (c: { country_name: string; country_code: string }) => {
+          const key = `country_${(c.country_code || '').toUpperCase()}`;
+          const tr = t(key);
+          return tr.startsWith('country_') ? c.country_name : tr;
+        };
+        return (
+          <div className="space-y-4 pt-6 px-4">
+            <p className="text-neutral-500 text-sm text-center mb-6">{t('withdraw_where')}</p>
+            <h2 className="text-xl font-bold text-center mb-6">{t('withdraw_select_country')}</h2>
+            {countries.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  Haptic.light();
+                  setSelectedCountry({ id: c.id, country_name: c.country_name, country_code: c.country_code, currency: c.currency });
+                  setStep('AMOUNT');
+                }}
+                className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all active:scale-[0.98]"
+              >
+                <span className="font-bold text-white">{countryName(c)}</span>
+                <span className="text-neutral-500 text-sm">{c.currency}</span>
+              </button>
+            ))}
+            <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
+              ← {t('back')}
+            </button>
+          </div>
+        );
+      }
+
       case 'NETWORK':
         return (
           <div className="max-w-md mx-auto pt-6 px-4 pb-8">
-            <p className="text-neutral-500 text-sm text-center mb-2">Вывод в криптовалюту</p>
-            <h2 className="text-xl font-bold text-white text-center mb-6">Выберите сеть</h2>
+            <p className="text-neutral-500 text-sm text-center mb-2">{t('withdraw_crypto_title')}</p>
+            <h2 className="text-xl font-bold text-white text-center mb-6">{t('withdraw_select_network')}</h2>
             <div className="grid grid-cols-2 gap-4">
               {CRYPTO_NETWORKS.map((net) => (
                 <button
@@ -161,7 +198,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               ))}
             </div>
             <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="w-full mt-6 text-neutral-500 text-sm py-2">
-              ← Назад
+              ← {t('back')}
             </button>
           </div>
         );
@@ -171,24 +208,24 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
           <div className="space-y-6 pt-6 px-4">
             {method === 'CRYPTO' && (
               <button type="button" onClick={() => { Haptic.light(); setStep('NETWORK'); }} className="text-neutral-500 text-sm">
-                ← Назад к выбору сети
+                {t('back_to_network')}
               </button>
             )}
             {method === 'CARD' && (
-              <button type="button" onClick={() => { Haptic.light(); setStep('METHOD'); }} className="text-neutral-500 text-sm">
-                ← Назад к способу вывода
+              <button type="button" onClick={() => { Haptic.light(); setStep('COUNTRY'); }} className="text-neutral-500 text-sm">
+                ← {t('back')}
               </button>
             )}
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 mb-2">
-              <span className="text-xs text-neutral-500 uppercase">Доступно</span>
-              <div className="text-2xl font-mono font-bold text-white">{formattedBalance} ₽</div>
-              <span className="text-xs text-neutral-500">Мин. вывод: {formattedMin} ₽</span>
+              <span className="text-xs text-neutral-500 uppercase">{t('available')}</span>
+              <div className="text-2xl font-mono font-bold text-white">{formattedBalance} {symbol}</div>
+              <span className="text-xs text-neutral-500">{t('min_withdraw')}: {formattedMin} {symbol}</span>
               {method === 'CRYPTO' && currentNetwork && (
-                <div className="text-xs text-neutral-400 mt-1">Сеть: {currentNetwork.label} ({currentNetwork.sub})</div>
+                <div className="text-xs text-neutral-400 mt-1">{t('network_label')}: {currentNetwork.label} ({currentNetwork.sub})</div>
               )}
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-neutral-500 uppercase font-bold pl-1">Сумма вывода (₽)</label>
+              <label className="text-xs text-neutral-500 uppercase font-bold pl-1">{t('amount_withdraw')}</label>
               <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl px-4 py-3 flex items-center justify-between focus-within:border-neon/50 transition-all">
                 <input
                   type="number"
@@ -198,30 +235,30 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                   className="w-full bg-transparent text-white font-mono text-2xl font-bold outline-none placeholder-neutral-700"
                   placeholder="0"
                 />
-                <span className="text-neutral-500 font-medium">₽</span>
+                <span className="text-neutral-500 font-medium">{symbol}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {[...new Set([minWithdraw, 1000, 5000, Math.min(Math.floor(balance * 0.5), balance)])].filter((v) => v >= minWithdraw).sort((a, b) => a - b).slice(0, 4).map((v) => (
                   <button key={v} type="button" onClick={() => { Haptic.tap(); setAmount(String(v)); }} className="px-3 py-1.5 rounded-lg bg-white/5 text-neutral-400 text-sm font-mono hover:bg-neon/20 hover:text-neon active:scale-95">
-                    {v >= 1000 ? (v >= 10000 ? v / 1000 + 'k' : v) : v} ₽
+                    {formatPrice(v)}
                   </button>
                 ))}
               </div>
               <div className="flex justify-between px-1">
-                <span className="text-[10px] text-neutral-600">Мин: {formattedMin} ₽</span>
-                <span className="text-[10px] text-neutral-600">Макс: {formattedBalance} ₽</span>
+                <span className="text-[10px] text-neutral-600">Мин: {formattedMin} {symbol}</span>
+                <span className="text-[10px] text-neutral-600">Макс: {formattedBalance} {symbol}</span>
               </div>
             </div>
             <button
               onClick={() => {
                 if (!amount || isNaN(amountNum) || amountNum < minWithdraw) {
                   Haptic.error();
-                  toast.show(`Минимальная сумма вывода: ${formattedMin} ₽`, 'error');
+                  toast.show(`${t('min_withdraw_toast', { amount: formattedMin })} ${symbol}`, 'error');
                   return;
                 }
                 if (amountNum > balance) {
                   Haptic.error();
-                  toast.show('Недостаточно средств на балансе.', 'error');
+                  toast.show(t('insufficient_balance'), 'error');
                   return;
                 }
                 Haptic.light();
@@ -230,7 +267,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               disabled={!amount || amountNum < minWithdraw || amountNum > balance}
               className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:pointer-events-none"
             >
-              Далее
+              {t('withdraw_further')}
             </button>
           </div>
         );
@@ -239,15 +276,15 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
         return (
           <div className="space-y-6 pt-6 px-4">
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4">
-              <span className="text-xs text-neutral-500 uppercase">Сумма</span>
-              <div className="text-xl font-mono font-bold text-white">{formattedAmount} ₽</div>
+              <span className="text-xs text-neutral-500 uppercase">{t('withdraw_amount_label')}</span>
+              <div className="text-xl font-mono font-bold text-white">{formattedAmount} {symbol}</div>
               {method === 'CRYPTO' && currentNetwork && (
-                <div className="text-xs text-neutral-400 mt-1">Сеть: {currentNetwork.label} ({currentNetwork.sub})</div>
+                <div className="text-xs text-neutral-400 mt-1">{t('network_label')}: {currentNetwork.label} ({currentNetwork.sub})</div>
               )}
             </div>
             <div className="space-y-2">
               <label className="text-xs text-neutral-500 uppercase font-bold pl-1">
-                {method === 'CRYPTO' ? 'Адрес кошелька для получения' : 'Реквизиты для получения'}
+                {method === 'CRYPTO' ? t('withdraw_address_for_receive') : t('withdraw_requisites_for_receive')}
               </label>
               <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl px-4 py-3 focus-within:border-neon/50 transition-all">
                 {method === 'CRYPTO' ? (
@@ -256,7 +293,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                     value={requisites}
                     onChange={(e) => setRequisites(e.target.value.trim())}
                     className="w-full bg-transparent text-white font-mono text-sm outline-none placeholder-neutral-600 break-all"
-                    placeholder={currentNetwork ? `Адрес ${currentNetwork.label} (${currentNetwork.sub})` : 'Адрес кошелька'}
+                    placeholder={currentNetwork ? `${t('withdraw_crypto_address')} ${currentNetwork.label} (${currentNetwork.sub})` : t('withdraw_crypto_address')}
                   />
                 ) : (
                   <input
@@ -265,21 +302,21 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                     value={requisites}
                     onChange={(e) => setRequisites(e.target.value.replace(/\D/g, '').slice(0, 24))}
                     className="w-full bg-transparent text-white font-mono text-lg outline-none placeholder-neutral-600"
-                    placeholder="Номер карты или счёта"
+                    placeholder={t('withdraw_requisites_hint')}
                   />
                 )}
               </div>
               <p className="text-[10px] text-neutral-600 px-1">
                 {method === 'CRYPTO'
-                  ? 'Введите адрес кошелька в выбранной сети. Проверьте сеть — перевод не в ту сеть приведёт к потере средств.'
-                  : 'Введите номер карты или счёта, куда перевести средства.'}
+                  ? t('withdraw_address_hint')
+                  : t('withdraw_requisites_hint_long')}
               </p>
             </div>
             <button
               onClick={() => {
                 if (!requisites.trim()) {
                   Haptic.error();
-                  toast.show(method === 'CRYPTO' ? 'Введите адрес кошелька.' : 'Введите реквизиты.', 'error');
+                  toast.show(method === 'CRYPTO' ? t('withdraw_enter_address_toast') : t('withdraw_enter_requisites_toast'), 'error');
                   return;
                 }
                 Haptic.light();
@@ -288,13 +325,13 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               disabled={!requisites.trim()}
               className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:pointer-events-none"
             >
-              Далее
+              {t('withdraw_further')}
             </button>
             <button
               onClick={() => { Haptic.tap(); setStep('AMOUNT'); }}
               className="w-full py-3 border border-neutral-700 text-neutral-400 rounded-xl font-medium active:scale-[0.98]"
             >
-              Назад
+              {t('back')}
             </button>
           </div>
         );
@@ -302,23 +339,23 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
       case 'CONFIRM':
         return (
           <div className="pt-6 px-4 flex flex-col">
-            <h2 className="text-lg font-bold text-center mb-6">Подтверждение вывода</h2>
+            <h2 className="text-lg font-bold text-center mb-6">{t('withdraw_confirm_title')}</h2>
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-5 space-y-4 mb-6 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1 h-full bg-neon" />
               <div>
-                <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Сумма</div>
-                <div className="text-2xl font-mono font-bold text-white">{formattedAmount} ₽</div>
+                <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{t('withdraw_amount_label')}</div>
+                <div className="text-2xl font-mono font-bold text-white">{formattedAmount} {symbol}</div>
               </div>
               <div className="h-px bg-white/5 w-full" />
               {method === 'CRYPTO' && currentNetwork && (
                 <div>
-                  <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Сеть</div>
+                  <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{t('network_label')}</div>
                   <div className="text-sm font-medium text-white">{currentNetwork.label} ({currentNetwork.sub})</div>
                 </div>
               )}
               <div>
                 <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">
-                  {method === 'CRYPTO' ? 'Адрес кошелька' : 'Реквизиты'}
+                  {method === 'CRYPTO' ? t('withdraw_crypto_address') : t('withdraw_requisites_label')}
                 </div>
                 <div className="text-sm font-mono text-white bg-neutral-900 rounded-lg p-3 border border-dashed border-neutral-700 break-all">
                   {requisitesNormalized ? maskRequisites(requisitesNormalized, method === 'CRYPTO') : '—'}
@@ -326,16 +363,16 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               </div>
             </div>
             <button
-              onClick={() => tgid ? requirePin(tgid, 'Введите пароль для вывода средств', handleConfirmWithdraw) : handleConfirmWithdraw()}
+              onClick={() => tgid ? requirePin(tgid, t('enter_pin_for_withdraw'), handleConfirmWithdraw) : handleConfirmWithdraw()}
               className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform shadow-[0_4px_20px_rgba(163,230,53,0.2)] mt-auto mb-6"
             >
-              Подтвердить вывод
+              {t('withdraw_confirm_btn')}
             </button>
             <button
               onClick={() => { Haptic.light(); setStep('REQUISITES'); }}
               className="w-full py-3 border border-neutral-700 text-neutral-400 rounded-xl font-medium"
             >
-              Назад
+              {t('back')}
             </button>
           </div>
         );
@@ -347,9 +384,9 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               <div className="absolute inset-0 rounded-full border-2 border-neon/40 border-t-transparent animate-spin" />
               <Loader2 size={40} className="text-neon animate-pulse" />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Обработка заявки</h2>
+            <h2 className="text-xl font-bold text-white mb-2">{t('withdraw_processing')}</h2>
             <p className="text-neutral-500 text-sm text-center max-w-xs">
-              Проверяем реквизиты и списываем средства...
+              {t('withdraw_checking')}
             </p>
           </div>
         );
@@ -361,18 +398,18 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               <div className="absolute inset-0 rounded-full border-2 border-green-500/50 animate-pulse" />
               <CheckCircle2 size={56} className="text-green-500" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Вывод одобрен</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">{t('withdraw_approved')}</h2>
             <p className="text-neutral-400 mb-2">
-              <span className="font-mono text-white">{formattedAmount} ₽</span> списаны с баланса.
+              <span className="font-mono text-white">{formattedAmount} {symbol}</span> {t('withdrawn_from_balance')}.
             </p>
             <p className="text-neutral-500 text-sm mb-8 max-w-xs">
-              Средства поступят на указанные реквизиты в ближайшее время.
+              {t('withdraw_funds_note')}
             </p>
             <button
               onClick={() => { Haptic.tap(); onBack(); }}
               className="px-8 py-3 rounded-full bg-neon text-black font-bold active:scale-95"
             >
-              На главную
+              {t('withdraw_to_profile')}
             </button>
           </div>
         );
@@ -384,14 +421,14 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               <div className="h-16 w-16 rounded-full bg-neutral-800 flex items-center justify-center text-3xl mb-4">
                 {template?.icon || '💬'}
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">{template?.title || 'Заявка на вывод'}</h2>
+              <h2 className="text-xl font-bold text-white mb-2">{template?.title || t('withdraw_request_title')}</h2>
               <p className="text-neutral-500 text-sm mb-6">
-                Ваша заявка на <span className="font-mono text-white">{formattedAmount} ₽</span> принята.
+                {t('withdraw_request_accepted', { amount: `${formattedAmount} ${symbol}` })}
               </p>
             </div>
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-5 mb-6">
               <p className="text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">
-                {template?.description || 'Для завершения вывода свяжитесь с поддержкой. Укажите сумму и реквизиты.'}
+                {template?.description || t('withdraw_contact_support_desc')}
               </p>
             </div>
             <a
@@ -401,13 +438,13 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               className="block w-full py-4 bg-neon text-black font-bold rounded-xl text-center active:scale-95 transition-transform mb-4"
               onClick={() => Haptic.tap()}
             >
-              {template?.button_text || 'Написать в поддержку'}
+              {template?.button_text || t('write_to_support')}
             </a>
             <button
               onClick={() => { Haptic.tap(); onBack(); }}
               className="w-full py-3 border border-neutral-700 text-neutral-400 rounded-xl font-medium"
             >
-              На главную
+              {t('withdraw_to_profile')}
             </button>
           </div>
         );
@@ -426,7 +463,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
           <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white mr-4">
             <ArrowLeft size={24} />
           </button>
-          <span className="text-lg font-bold">Вывод средств</span>
+          <span className="text-lg font-bold">{t('withdraw_title')}</span>
         </header>
       )}
 

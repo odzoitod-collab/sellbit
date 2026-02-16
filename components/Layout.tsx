@@ -9,7 +9,7 @@ interface LayoutProps {
   onNavigate: (page: PageView) => void;
 }
 
-const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['KYC', 'DEPOSIT', 'WITHDRAW'];
+const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['KYC', 'DEPOSIT', 'WITHDRAW', 'CURRENCY', 'LANGUAGE'];
 
 const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) => {
   const { keyboardOpen } = useKeyboard();

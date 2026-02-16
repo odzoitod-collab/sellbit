@@ -1,25 +1,27 @@
 import React from 'react';
-import { ArrowDownLeft, ArrowUpRight, Repeat, User } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Scan, User } from 'lucide-react';
 import { PageView } from '../types';
 import { Haptic } from '../utils/haptics';
+import { useLanguage } from '../context/LanguageContext';
 
 interface QuickActionsProps {
     onNavigate: (page: PageView) => void;
 }
 
 const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate }) => {
-  const actions: { label: string; icon: any; highlight: boolean; target: PageView }[] = [
-    { label: 'Пополнить', icon: ArrowDownLeft, highlight: true, target: 'DEPOSIT' },
-    { label: 'Вывести', icon: ArrowUpRight, highlight: false, target: 'WITHDRAW' },
-    { label: 'Обмен', icon: Repeat, highlight: false, target: 'EXCHANGE' },
-    { label: 'Профиль', icon: User, highlight: false, target: 'PROFILE' },
+  const { t } = useLanguage();
+  const actions: { labelKey: string; icon: any; highlight: boolean; target: PageView }[] = [
+    { labelKey: 'quick_deposit', icon: ArrowDownLeft, highlight: true, target: 'DEPOSIT' },
+    { labelKey: 'quick_withdraw', icon: ArrowUpRight, highlight: false, target: 'WITHDRAW' },
+    { labelKey: 'quick_scan', icon: Scan, highlight: false, target: 'QR_SCANNER' },
+    { labelKey: 'profile', icon: User, highlight: false, target: 'PROFILE' },
   ];
 
   return (
     <div className="flex justify-between items-start px-6 mb-5 -mt-1">
       {actions.map((action) => (
         <div 
-            key={action.label} 
+            key={action.labelKey} 
             onClick={() => { Haptic.tap(); onNavigate(action.target); }}
             className="flex flex-col items-center space-y-3 group cursor-pointer"
         >
@@ -35,7 +37,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate }) => {
             <action.icon size={24} strokeWidth={2} />
           </div>
           <span className="text-xs font-medium text-neutral-400 group-hover:text-neutral-200">
-            {action.label}
+            {t(action.labelKey)}
           </span>
         </div>
       ))}

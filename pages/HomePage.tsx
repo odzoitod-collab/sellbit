@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import HomeHeader from '../components/HomeHeader';
+import { useCurrency } from '../context/CurrencyContext';
+import { useLanguage } from '../context/LanguageContext';
 import BalanceDisplay from '../components/BalanceDisplay';
 import QuickActions from '../components/QuickActions';
 import MarketTicker from '../components/MarketTicker';
@@ -14,9 +16,12 @@ interface HomePageProps {
     onNavigateToTrading: (asset: Asset) => void;
     onSearch: () => void;
     onNavigate: (page: PageView) => void;
+    onCurrencyClick?: () => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading, onSearch, onNavigate }) => {
+const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading, onSearch, onNavigate, onCurrencyClick }) => {
+  const { formatPrice, convertFromRub, symbol } = useCurrency();
+  const { t } = useLanguage();
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const balanceRef = useRef<HTMLDivElement>(null);
   const liveAssets = useLiveAssets(MOCK_ASSETS);
@@ -51,12 +56,13 @@ const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading,
         showBalanceTitle={isBalanceHidden} 
         balance={balance} 
         user={user}
-        onSearch={onSearch} 
+        onSearch={onSearch}
+        onProfileClick={() => onNavigate('PROFILE')}
       />
       
       {/* Wrap BalanceDisplay in a ref div to track scrolling */}
       <div ref={balanceRef} className="opacity-100 transition-opacity duration-300">
-        <BalanceDisplay balance={balance} />
+        <BalanceDisplay balance={balance} onCurrencyClick={onCurrencyClick} />
       </div>
 
       <QuickActions onNavigate={onNavigate} />
@@ -65,9 +71,9 @@ const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading,
       <div className="px-4 mt-2 flex items-center justify-between text-[11px] text-neutral-500">
         <span className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-          Все системы работают
+          {t('all_systems_ok')}
         </span>
-        <span className="font-mono">24ч объём: 12.4 млрд ₽</span>
+        <span className="font-mono">{t('vol_24h')}: {(convertFromRub(12.4e9) / 1e9).toFixed(1)} {symbol}</span>
       </div>
 
       <div className="px-4 mt-3">

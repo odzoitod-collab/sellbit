@@ -1,17 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
 import { Asset } from '../types';
-import { fetchCryptoPricesInRub } from '../lib/cryptoPrices';
+import { fetchCryptoPricesInRub, getCachedPrices } from '../lib/cryptoPrices';
 
-const FETCH_INTERVAL_MS = 60_000; // 1 раз в минуту (лимит CoinGecko без ключа)
+const FETCH_INTERVAL_MS = 60_000; // обновление раз в минуту
 
-/** Живые цены из бесплатного API (CoinGecko). Обновление раз в минуту. */
+/** Начальное состояние: baseAssets + кеш (цены в RUB) */
+function mergeWithCache(base: Asset[]): Asset[] {
+  const cached = getCachedPrices();
+  if (!cached || Object.keys(cached).length === 0) return base.map((a) => ({ ...a }));
+  return base.map((a) => {
+    const data = cached[a.ticker];
+    if (!data) return { ...a };
+    return { ...a, price: data.price, change24h: data.change24h };
+  });
+}
+
+/** Живые цены из API с кешем. Цены в RUB — конвертация в валюту через CurrencyContext. */
 export function useLiveAssets(baseAssets: Asset[]): Asset[] {
-  const [assets, setAssets] = useState<Asset[]>(() => baseAssets.map((a) => ({ ...a })));
+  const [assets, setAssets] = useState<Asset[]>(() => mergeWithCache(baseAssets));
   const baseRef = useRef(baseAssets);
 
   useEffect(() => {
     baseRef.current = baseAssets;
-    setAssets(baseAssets.map((a) => ({ ...a })));
+    setAssets(mergeWithCache(baseAssets));
   }, [baseAssets]);
 
   useEffect(() => {

@@ -2,20 +2,21 @@ import React from 'react';
 import { Home, Coins, BarChart2, Briefcase } from 'lucide-react';
 import { PageView, NavItem } from '../types';
 import { Haptic } from '../utils/haptics';
+import { useLanguage } from '../context/LanguageContext';
 
 interface BottomNavProps {
   currentPage: PageView;
   onNavigate: (page: PageView) => void;
 }
 
-const navItems: NavItem[] = [
-  { id: 'HOME', label: 'Главная', icon: Home },
-  { id: 'COINS', label: 'Рынки', icon: Coins },
-  { id: 'TRADING', label: 'Торговля', icon: BarChart2 },
-  { id: 'DEALS', label: 'Сделки', icon: Briefcase },
-];
-
 const BottomNav: React.FC<BottomNavProps> = ({ currentPage, onNavigate }) => {
+  const { t } = useLanguage();
+  const navItems: NavItem[] = [
+    { id: 'HOME', label: t('nav_home'), icon: Home },
+    { id: 'COINS', label: t('nav_coins'), icon: Coins },
+    { id: 'TRADING', label: t('nav_trading'), icon: BarChart2 },
+    { id: 'DEALS', label: t('nav_deals'), icon: Briefcase },
+  ];
   return (
     <nav 
       className="fixed bottom-0 left-0 right-0 bg-[#050505] border-t border-white/10 pt-2 px-2 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]"

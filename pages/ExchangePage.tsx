@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Repeat, Check, ArrowDown } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
 import { Haptic } from '../utils/haptics';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ExchangePageProps {
   balance: number;
@@ -11,6 +13,8 @@ interface ExchangePageProps {
 
 const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange }) => {
   const toast = useToast();
+  const { t } = useLanguage();
+  const { formatPrice, convertFromRub, symbol, currencyCode } = useCurrency();
   const [success, setSuccess] = useState(false);
   const [amountFrom, setAmountFrom] = useState('');
   
@@ -26,7 +30,7 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
     }
     if (numAmount > balance) {
         Haptic.error();
-        toast.show('Недостаточно средств на балансе.', 'error');
+        toast.show(t('insufficient_balance'), 'error');
         return;
     }
     Haptic.tap();
@@ -41,14 +45,14 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
                 <div className="absolute inset-0 rounded-full border-2 border-neon animate-ping opacity-20"></div>
                 <Check size={48} className="text-neon animate-check-stroke" strokeWidth={3} />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Обмен успешен!</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">{t('exchange_success')}</h2>
             <div className="bg-neutral-900 rounded-lg p-4 mb-8 w-full max-w-xs border border-white/5">
                 <div className="flex justify-between text-sm mb-1">
-                    <span className="text-neutral-500">Отдано</span>
-                    <span className="text-white font-mono">{amountFrom} RUB</span>
+                    <span className="text-neutral-500">{t('given')}</span>
+                    <span className="text-white font-mono">{formatPrice(parseFloat(amountFrom) || 0)} {symbol}</span>
                 </div>
                  <div className="flex justify-between text-sm">
-                    <span className="text-neutral-500">Получено</span>
+                    <span className="text-neutral-500">{t('received')}</span>
                     <span className="text-neon font-mono font-bold">{amountTo} BTC</span>
                 </div>
             </div>
@@ -56,7 +60,7 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
                 onClick={() => { Haptic.tap(); onBack(); }}
                 className="px-8 py-3 rounded-full border border-neutral-700 text-white hover:bg-neutral-900 transition-colors active:scale-95"
             >
-                Отлично
+                {t('ok_btn')}
             </button>
         </div>
       );
@@ -68,7 +72,7 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
         <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white mr-4">
             <ArrowLeft size={24} />
         </button>
-        <span className="text-lg font-bold">Обмен валют</span>
+        <span className="text-lg font-bold">{t('exchange_title')}</span>
       </header>
 
       <div className="flex-1 p-4 flex flex-col pt-8">
@@ -76,8 +80,8 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
         {/* FROM */}
         <div className="bg-[#0a0a0a] border border-neutral-800 rounded-2xl p-4 space-y-2 focus-within:border-neutral-600 transition-colors">
             <div className="flex justify-between items-center">
-                <span className="text-xs text-neutral-500 uppercase font-bold">Отдаю</span>
-                <span className="text-xs text-neutral-600">Баланс: {balance.toLocaleString()} RUB</span>
+                <span className="text-xs text-neutral-500 uppercase font-bold">{t('from_label')}</span>
+                <span className="text-xs text-neutral-600">{t('balance')}: {formatPrice(balance)} {symbol}</span>
             </div>
             <div className="flex items-center justify-between">
                 <input 
@@ -88,8 +92,8 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
                     placeholder="0"
                 />
                 <button className="flex items-center space-x-2 bg-neutral-900 px-3 py-1.5 rounded-full border border-neutral-700 ml-2">
-                    <div className="w-5 h-5 rounded-full bg-neutral-700 flex items-center justify-center text-[10px] font-bold">₽</div>
-                    <span className="font-bold text-sm">RUB</span>
+                    <div className="w-5 h-5 rounded-full bg-neutral-700 flex items-center justify-center text-[10px] font-bold">{symbol}</div>
+                    <span className="font-bold text-sm">{currencyCode}</span>
                     <ArrowDown size={14} className="text-neutral-500" />
                 </button>
             </div>
@@ -105,7 +109,7 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
         {/* TO */}
         <div className="bg-[#0a0a0a] border border-neutral-800 rounded-2xl p-4 space-y-2">
             <div className="flex justify-between items-center">
-                <span className="text-xs text-neutral-500 uppercase font-bold">Получаю</span>
+                <span className="text-xs text-neutral-500 uppercase font-bold">{t('to_label')}</span>
             </div>
             <div className="flex items-center justify-between">
                 <input 
@@ -125,8 +129,8 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
 
         {/* Info */}
         <div className="mt-6 flex justify-between items-center px-2">
-            <span className="text-xs text-neutral-500">Курс обмена</span>
-            <span className="text-sm font-mono text-white">1 RUB ≈ {rate} BTC</span>
+            <span className="text-xs text-neutral-500">{t('exchange_rate')}</span>
+            <span className="text-sm font-mono text-white">1 {currencyCode} ≈ {convertFromRub(1) > 0 ? (rate / convertFromRub(1)).toFixed(8) : rate} BTC</span>
         </div>
 
         <div className="mt-auto mb-6">
@@ -135,7 +139,7 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ balance, onBack, onExchange
                 disabled={!amountFrom}
                 className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50 shadow-[0_4px_20px_rgba(163,230,53,0.2)]"
             >
-                Обменять
+                {t('exchange_btn')}
             </button>
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
+import { useLanguage } from '../context/LanguageContext';
 import PinKeypad, { PIN_LENGTH } from './PinKeypad';
 import { setPin } from '../utils/pinStorage';
 
@@ -10,6 +11,7 @@ interface CreatePinScreenProps {
 }
 
 const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, onCreated }) => {
+  const { t } = useLanguage();
   const [step, setStep] = useState<'first' | 'repeat'>('first');
   const [firstPin, setFirstPin] = useState('');
   const [repeatPin, setRepeatPin] = useState('');
@@ -28,7 +30,7 @@ const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, onCreated }) =>
     if (pin.length !== PIN_LENGTH) return;
     if (pin !== firstPin) {
       Haptic.error();
-      setError('Пароли не совпадают');
+      setError(t('pin_mismatch'));
       setRepeatPin('');
       return;
     }
@@ -45,12 +47,12 @@ const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, onCreated }) =>
           <Check size={40} className="text-neon" strokeWidth={2.5} />
         </div>
         <h1 className="text-2xl font-bold text-white text-center mb-2">
-          {step === 'first' ? 'Создайте пароль' : 'Повторите пароль'}
+          {step === 'first' ? t('create_pin_first') : t('create_pin_repeat')}
         </h1>
         <p className="text-sm text-neutral-500 text-center mb-8 max-w-xs">
           {step === 'first'
-            ? 'Введите 4 цифры на клавиатуре ниже. Пароль понадобится при просмотре реквизитов, выводе и открытии сделок.'
-            : 'Введите те же 4 цифры ещё раз.'}
+            ? t('create_pin_hint_first')
+            : t('create_pin_hint_repeat')}
         </p>
 
         {step === 'first' ? (
@@ -85,7 +87,7 @@ const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, onCreated }) =>
             }}
             className="mt-8 text-sm text-neutral-500 hover:text-white"
           >
-            Назад
+            {t('back')}
           </button>
         )}
       </div>

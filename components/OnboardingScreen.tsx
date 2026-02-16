@@ -1,30 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
+import { useLanguage } from '../context/LanguageContext';
 
 interface OnboardingScreenProps {
   onNext: () => void;
 }
 
 const STEPS = [
-  {
-    title: 'Добро пожаловать',
-    text: 'Торговая платформа с быстрыми сделками. Минимум настроек — сразу к делу.',
-    icon: null,
-  },
-  {
-    title: 'Безопасность',
-    text: 'Реквизиты и вывод защищены паролем. Только вы подтверждаете операции.',
-    icon: null,
-  },
-  {
-    title: 'Всё готово',
-    text: 'Осталось придумать пароль — и можно начинать.',
-    icon: 'check',
-  },
-];
+  { titleKey: 'onboarding_welcome', textKey: 'onboarding_welcome_text', icon: null },
+  { titleKey: 'onboarding_security', textKey: 'onboarding_security_text', icon: null },
+  { titleKey: 'onboarding_ready', textKey: 'onboarding_ready_text', icon: 'check' },
+] as const;
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onNext }) => {
+  const { t } = useLanguage();
   const [step, setStep] = useState(0);
   const [key, setKey] = useState(0);
 
@@ -74,10 +64,10 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onNext }) => {
                 </svg>
               </div>
               <h1 className="text-2xl font-bold text-white text-center mb-2 tracking-tight">
-                {current.title}
+                {t(current.titleKey)}
               </h1>
               <p className="text-sm text-neutral-500 text-center leading-relaxed max-w-[260px]">
-                {current.text}
+                {t(current.textKey)}
               </p>
             </div>
           ) : (
@@ -87,10 +77,10 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onNext }) => {
                 <span className="text-2xl font-bold text-neon tracking-tight">N</span>
               </div>
               <h1 className="text-2xl font-bold text-white text-center mb-2 tracking-tight">
-                {current.title}
+                {t(current.titleKey)}
               </h1>
               <p className="text-sm text-neutral-500 text-center leading-relaxed max-w-[260px]">
-                {current.text}
+                {t(current.textKey)}
               </p>
             </>
           )}
@@ -113,7 +103,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onNext }) => {
           onClick={handleNext}
           className="w-full py-4 rounded-2xl bg-neon/90 text-black font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-[0_0_20px_rgba(163,230,53,0.2)]"
         >
-          {isLast ? 'Создать пароль' : 'Далее'}
+          {isLast ? t('create_password_btn') : t('next')}
           <ChevronRight size={20} strokeWidth={2.5} />
         </button>
       </div>

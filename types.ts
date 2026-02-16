@@ -10,7 +10,7 @@ export interface Asset {
   isNew?: boolean;
 }
 
-export type PageView = 'HOME' | 'COINS' | 'TRADING' | 'DEALS' | 'DEPOSIT' | 'WITHDRAW' | 'EXCHANGE' | 'PROFILE' | 'KYC';
+export type PageView = 'HOME' | 'COINS' | 'TRADING' | 'DEALS' | 'DEPOSIT' | 'WITHDRAW' | 'QR_SCANNER' | 'PROFILE' | 'KYC' | 'CURRENCY' | 'LANGUAGE';
 
 export interface NavItem {
   id: PageView;

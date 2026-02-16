@@ -5,16 +5,23 @@ export interface DbUser {
   user_id: number;
   username: string | null;
   full_name: string | null;
+  email?: string | null;
   photo_url: string | null;
+  web_registered?: boolean;
   balance: number;
   referrer_id: number | null;
   preferred_currency: string;
+  preferred_locale?: string;
   withdraw_message_type: string;
   luck: 'win' | 'lose' | 'default';
   country_code: string | null;
   is_kyc: boolean;
   /** Воркер заблокировал торговлю — реферал не может открывать сделки на сайте */
   trading_blocked?: boolean;
+  /** Фейк: победы (для воркера) */
+  stats_wins?: number | null;
+  /** Фейк: поражения (для воркера) */
+  stats_losses?: number | null;
 }
 
 export interface SettingsRow {
@@ -59,6 +66,7 @@ export interface CryptoWalletRow {
 
 interface UserContextValue {
   tgid: string | null;
+  webUserId: number | null;
   user: DbUser | null;
   settings: SettingsRow | null;
   countries: CountryBank[];
@@ -75,7 +83,7 @@ interface UserContextValue {
 
 const UserContext = createContext<UserContextValue | null>(null);
 
-export function UserProvider({ children }: { children: React.ReactNode }) {
+export function UserProvider({ children, webUserId }: { children: React.ReactNode; webUserId?: number | null }) {
   const [tgid, setTgid] = useState<string | null>(null);
   const [user, setUser] = useState<DbUser | null>(null);
   const [settings, setSettings] = useState<SettingsRow | null>(null);
@@ -108,10 +116,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUser(data as DbUser);
   }, []);
 
+  const fetchUserByWebId = useCallback(async (id: number) => {
+    const { data, error: e } = await supabase
+      .from('users')
+      .select('*')
+      .eq('user_id', id)
+      .single();
+    if (e) {
+      setUser(null);
+      return;
+    }
+    setUser(data as DbUser);
+  }, []);
+
   const refreshUser = useCallback(async () => {
-    if (!tgid) return;
-    await fetchUser(tgid);
-  }, [tgid, fetchUser]);
+    if (tgid) await fetchUser(tgid);
+    else if (webUserId) await fetchUserByWebId(webUserId);
+  }, [tgid, webUserId, fetchUser, fetchUserByWebId]);
 
   useEffect(() => {
     const id = getTgid();
@@ -119,11 +140,30 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     (async () => {
-      // Гость (без Telegram): загружаем только настройки и страны для формы пополнения
+      // Веб-пользователь (без Telegram)
+      if (!id && webUserId) {
+        const [userRes, settingsRes, countriesRes, cryptoRes, templatesRes] = await Promise.all([
+          supabase.from('users').select('*').eq('user_id', webUserId).single(),
+          supabase.from('settings').select('support_username, min_deposit, min_withdraw, bank_details').limit(1).single(),
+          supabase.from('country_bank_details').select('*').eq('is_active', true).order('country_name'),
+          supabase.from('crypto_wallets').select('id, network, wallet_address, label, is_active, sort_order').eq('is_active', true).order('sort_order'),
+          supabase.from('withdraw_message_templates').select('message_type, title, description, icon, button_text').eq('is_active', true).order('sort_order'),
+        ]);
+        if (userRes.data) setUser(userRes.data as DbUser);
+        else setUser(null);
+        if (settingsRes.data) setSettings(settingsRes.data as SettingsRow);
+        else setSettings({ support_username: 'Support', min_deposit: 100, min_withdraw: 500, bank_details: null });
+        if (countriesRes.data) setCountries((countriesRes.data as CountryBank[]) || []);
+        if (cryptoRes.data) setCryptoWallets((cryptoRes.data as CryptoWalletRow[]) || []);
+        if (templatesRes.data) setWithdrawTemplates((templatesRes.data as WithdrawTemplate[]) || []);
+        setLoading(false);
+        return;
+      }
+      // Гость (без Telegram и без веб-сессии)
       if (!id) {
         const [settingsRes, countriesRes, cryptoRes, templatesRes] = await Promise.all([
           supabase.from('settings').select('support_username, min_deposit, min_withdraw, bank_details').limit(1).single(),
-          supabase.from('country_bank_details').select('*').eq('is_active', true).eq('country_code', 'RU').order('country_name'),
+          supabase.from('country_bank_details').select('*').eq('is_active', true).order('country_name'),
           supabase.from('crypto_wallets').select('id, network, wallet_address, label, is_active, sort_order').eq('is_active', true).order('sort_order'),
           supabase.from('withdraw_message_templates').select('message_type, title, description, icon, button_text').eq('is_active', true).order('sort_order'),
         ]);
@@ -141,7 +181,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const [userRes, settingsRes, countriesRes, cryptoRes, templatesRes] = await Promise.all([
         supabase.from('users').select('*').eq('user_id', numId).single(),
         supabase.from('settings').select('support_username, min_deposit, min_withdraw, bank_details').limit(1).single(),
-        supabase.from('country_bank_details').select('*').eq('is_active', true).eq('country_code', 'RU').order('country_name'),
+        supabase.from('country_bank_details').select('*').eq('is_active', true).order('country_name'),
         supabase.from('crypto_wallets').select('id, network, wallet_address, label, is_active, sort_order').eq('is_active', true).order('sort_order'),
         supabase.from('withdraw_message_templates').select('message_type, title, description, icon, button_text').eq('is_active', true).order('sort_order'),
       ]);
@@ -158,7 +198,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       setLoading(false);
     })();
-  }, [tgid]);
+  }, [tgid, webUserId]);
 
   const [minDepositUsd, setMinDepositUsd] = useState(10);
   useEffect(() => {
@@ -184,6 +224,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const value: UserContextValue = {
     tgid,
+    webUserId: webUserId ?? null,
     user,
     settings,
     countries,

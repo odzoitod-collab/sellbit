@@ -6,7 +6,7 @@ import CoinsPage from './pages/CoinsPage';
 import DealsPage from './pages/DealsPage';
 import DepositPage from './pages/DepositPage';
 import WithdrawPage from './pages/WithdrawPage';
-import ExchangePage from './pages/ExchangePage';
+import QRScannerPage from './pages/QRScannerPage';
 import ProfilePage from './pages/ProfilePage';
 import KycPage from './pages/KycPage';
 import { PageView, Asset, Deal, DealStatus } from './types';
@@ -17,8 +17,36 @@ import { usePin } from './context/PinContext';
 import { supabase } from './lib/supabase';
 import { tradeRowToDeal, dealToTradeInsert } from './lib/trades';
 import { useToast } from './context/ToastContext';
+import { useLanguage } from './context/LanguageContext';
 import CreatePinScreen from './components/CreatePinScreen';
 import OnboardingScreen from './components/OnboardingScreen';
+import CurrencyPickerPage from './pages/CurrencyPickerPage';
+import LanguagePickerPage from './pages/LanguagePickerPage';
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import { CurrencyProvider, useCurrency } from './context/CurrencyContext';
+import { useWebAuth } from './context/WebAuthContext';
+
+/** Синхронизирует язык и валюту с данными пользователя */
+function LocaleCurrencySync() {
+  const { tgid, webUserId, user } = useUser();
+  const { setLocale } = useLanguage();
+  const { setBaseCurrency } = useCurrency();
+  const isLoggedIn = !!(tgid || webUserId) && user;
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      const loc = (user.preferred_locale || 'en').toLowerCase();
+      if (['en', 'ru', 'pl', 'kk', 'cs'].includes(loc)) setLocale(loc as 'en' | 'ru' | 'pl' | 'kk' | 'cs');
+      const cur = (user.preferred_currency || 'USD').toLowerCase();
+      if (cur) setBaseCurrency(cur);
+    } else if (!tgid && !webUserId) {
+      setLocale('en');
+      setBaseCurrency('usd');
+    }
+  }, [tgid, webUserId, user?.preferred_locale, user?.preferred_currency, setLocale, setBaseCurrency]);
+  return null;
+}
 
 type Side = 'UP' | 'DOWN';
 type LuckMode = 'WIN' | 'LOSE' | 'RANDOM';
@@ -65,24 +93,33 @@ function calculateTradeResult(
   };
 }
 
+type AuthSubPage = null | 'login' | 'register';
+
 const App: React.FC = () => {
-  const { user, tgid, loading, error, refreshUser } = useUser();
-  const { hasPin, requirePin } = usePin();
+  const { user, tgid, webUserId, loading, error, refreshUser } = useUser();
+  const { hasPin } = usePin();
+  const { webUserId: webId } = useWebAuth();
   const toast = useToast();
+  const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState<PageView>('HOME');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [pinCreated, setPinCreated] = useState(false);
+  const [authSubPage, setAuthSubPage] = useState<AuthSubPage>(null);
+
+  const refId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
+  // Требуем вход/регистрацию при любом заходе не через TG (не mini app, не бота)
+  const showAuthGate = !tgid && !webId && !loading;
   const userLuckRef = useRef<'win' | 'lose' | 'default'>(user?.luck ?? 'default');
   const paidDealIds = useRef<Set<string>>(new Set());
   userLuckRef.current = user?.luck ?? 'default';
 
   const balance = user?.balance ?? 0;
 
-  // Загрузка сделок из БД (история только из базы, без дублей из памяти)
+  // Загрузка сделок из БД
   useEffect(() => {
-    if (!tgid || !user) return;
+    if (!user) return;
     const uid = user.user_id;
     supabase
       .from('trades')
@@ -94,11 +131,11 @@ const App: React.FC = () => {
         const list = (data || []).map((row) => tradeRowToDeal(row as any));
         setDeals(list);
       });
-  }, [tgid, user?.user_id]);
+  }, [user?.user_id]);
 
   // Game loop: price movement and deal expiration; result by luck (win/lose/random)
   useEffect(() => {
-    if (!tgid) return;
+    if (!user) return;
     const interval = setInterval(() => {
       setDeals((currentDeals) => {
         if (currentDeals.length === 0) return currentDeals;
@@ -131,14 +168,15 @@ const App: React.FC = () => {
             // Начисляем на баланс только при положительном результате
             if (payout > 0 && !paidDealIds.current.has(deal.id)) {
               paidDealIds.current.add(deal.id);
+              const uid = user.user_id;
               supabase
                 .from('users')
                 .select('balance')
-                .eq('user_id', Number(tgid))
+                .eq('user_id', uid)
                 .single()
                 .then(({ data: row }) => {
                   const current = (row as { balance: number })?.balance ?? 0;
-                  return supabase.from('users').update({ balance: current + payout }).eq('user_id', Number(tgid));
+                  return supabase.from('users').update({ balance: current + payout }).eq('user_id', uid);
                 })
                 .then(() => refreshUser());
             }
@@ -193,7 +231,7 @@ const App: React.FC = () => {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [tgid, refreshUser]);
+  }, [user?.user_id, refreshUser]);
 
   const handleNavigate = (page: PageView) => {
     Haptic.light();
@@ -210,20 +248,20 @@ const App: React.FC = () => {
   const handleOpenDeal = async (newDeal: Deal) => {
     if (user?.trading_blocked) {
       Haptic.error();
-      toast.show('Торговля заблокирована. Обратитесь к вашему менеджеру.', 'error');
+      toast.show(t('trading_blocked_toast'), 'error');
       return;
     }
     if (balance < newDeal.amount) {
       Haptic.error();
-      toast.show('Недостаточно средств', 'error');
+      toast.show(t('insufficient_funds'), 'error');
       return;
     }
     const newBalance = balance - newDeal.amount;
-    const uid = Number(tgid!);
+    const uid = user!.user_id;
     const { error: e } = await supabase.from('users').update({ balance: newBalance }).eq('user_id', uid);
     if (e) {
       Haptic.error();
-      toast.show('Ошибка списания. Попробуйте снова.', 'error');
+      toast.show(t('withdraw_error'), 'error');
       return;
     }
     const insertRow = dealToTradeInsert(newDeal, uid);
@@ -234,7 +272,7 @@ const App: React.FC = () => {
       .single();
     if (insertErr) {
       Haptic.error();
-      toast.show('Ошибка создания сделки', 'error');
+      toast.show(t('deal_creation_error'), 'error');
       return;
     }
     const notifyBase = (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL?.replace(/\/api\/deposit-notify\/?$/, '');
@@ -272,11 +310,7 @@ const App: React.FC = () => {
     Haptic.light();
   };
 
-  const handleExchange = (fromAmount: number) => {
-    if (balance < fromAmount) {
-      Haptic.error();
-      return;
-    }
+  const handleQRScan = (_data: string) => {
     Haptic.success();
   };
 
@@ -287,8 +321,35 @@ const App: React.FC = () => {
       </div>
     );
   }
+  // Вход/регистрация — при заходе не через TG обязательно
+  if (showAuthGate) {
+    if (authSubPage === 'login') {
+      return (
+        <LoginPage
+          onBack={() => setAuthSubPage(null)}
+          onSuccess={() => setAuthSubPage(null)}
+        />
+      );
+    }
+    if (authSubPage === 'register') {
+      return (
+        <RegisterPage
+          refId={refId || ''}
+          onBack={() => setAuthSubPage(null)}
+          onSuccess={() => setAuthSubPage(null)}
+        />
+      );
+    }
+    return (
+      <LandingPage
+        refId={refId || ''}
+        onLogin={() => setAuthSubPage('login')}
+        onRegister={() => setAuthSubPage('register')}
+      />
+    );
+  }
   // Гость (без Telegram): показываем приложение с ограниченным функционалом
-  if (error) {
+  if (error && !refId) {
     return (
       <div className="h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-center">
         <p className="text-neutral-300 mb-4">{error}</p>
@@ -329,6 +390,7 @@ const App: React.FC = () => {
             onNavigate={handleNavigate}
             onNavigateToTrading={handleNavigateToTrading}
             onSearch={() => handleNavigate('COINS')}
+            onCurrencyClick={() => handleNavigate('CURRENCY')}
           />
         );
       case 'COINS':
@@ -349,18 +411,24 @@ const App: React.FC = () => {
         return <DepositPage onDeposit={handleDeposit} onBack={() => handleNavigate('HOME')} />;
       case 'WITHDRAW':
         return <WithdrawPage balance={balance} onWithdraw={handleWithdraw} onBack={() => handleNavigate('HOME')} />;
-      case 'EXCHANGE':
-        return <ExchangePage balance={balance} onExchange={handleExchange} onBack={() => handleNavigate('HOME')} />;
+      case 'QR_SCANNER':
+        return <QRScannerPage onBack={() => handleNavigate('HOME')} onScan={handleQRScan} />;
       case 'PROFILE':
         return (
           <ProfilePage
             deals={deals}
             onBack={() => handleNavigate('HOME')}
             onNavigateToKyc={() => setCurrentPage('KYC')}
+            onNavigateToCurrency={() => handleNavigate('CURRENCY')}
+            onNavigateToLanguage={() => handleNavigate('LANGUAGE')}
           />
         );
       case 'KYC':
         return <KycPage onBack={() => setCurrentPage('PROFILE')} />;
+      case 'CURRENCY':
+        return <CurrencyPickerPage onBack={() => handleNavigate('HOME')} />;
+      case 'LANGUAGE':
+        return <LanguagePickerPage onBack={() => handleNavigate('PROFILE')} />;
       default:
         return (
           <HomePage
@@ -369,15 +437,19 @@ const App: React.FC = () => {
             onNavigate={handleNavigate}
             onNavigateToTrading={handleNavigateToTrading}
             onSearch={() => handleNavigate('COINS')}
+            onCurrencyClick={() => handleNavigate('CURRENCY')}
           />
         );
     }
   };
 
   return (
-    <Layout currentPage={currentPage} onNavigate={handleNavigate}>
-      {renderContent()}
-    </Layout>
+    <CurrencyProvider>
+      <LocaleCurrencySync />
+      <Layout currentPage={currentPage} onNavigate={handleNavigate}>
+        {renderContent()}
+      </Layout>
+    </CurrencyProvider>
   );
 };
 

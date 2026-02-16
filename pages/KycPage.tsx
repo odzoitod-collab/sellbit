@@ -3,6 +3,7 @@ import { ArrowLeft, FileText, Camera, Check, Upload, ShieldCheck, User, Image, C
 import { Haptic } from '../utils/haptics';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { sendVerificationToTelegram, canSendDepositToTelegram } from '../lib/telegramNotify';
 
 type KycStep = 'DOC_TYPE' | 'NAME' | 'DOC_PHOTO' | 'SELFIE' | 'SUCCESS';
@@ -10,9 +11,9 @@ type KycStep = 'DOC_TYPE' | 'NAME' | 'DOC_PHOTO' | 'SELFIE' | 'SUCCESS';
 const STEPS_ORDER: KycStep[] = ['DOC_TYPE', 'NAME', 'DOC_PHOTO', 'SELFIE', 'SUCCESS'];
 
 const DOC_TYPES = [
-  { id: 'passport', label: 'Паспорт', desc: 'Разворот с фото и данными' },
-  { id: 'driver', label: 'Водительское удостоверение', desc: 'Обе стороны' },
-  { id: 'id', label: 'ID-карта', desc: 'Лицевая сторона с фото' },
+  { id: 'passport', labelKey: 'kyc_passport', descKey: 'kyc_passport_desc' },
+  { id: 'driver', labelKey: 'kyc_driver', descKey: 'kyc_driver_desc' },
+  { id: 'id', labelKey: 'kyc_id', descKey: 'kyc_id_desc' },
 ];
 
 interface KycPageProps {
@@ -22,6 +23,7 @@ interface KycPageProps {
 const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
   const { user, tgid } = useUser();
   const toast = useToast();
+  const { t } = useLanguage();
   const [step, setStep] = useState<KycStep>('DOC_TYPE');
   const [docType, setDocType] = useState<string>('');
   const [fullName, setFullName] = useState('');
@@ -61,14 +63,14 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
       if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraOn(true);
     } catch (e) {
-      toast.show('Не удалось получить доступ к камере', 'error');
+      toast.show(t('kyc_camera_error'), 'error');
     }
   };
 
   const captureSelfie = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) {
-      toast.show('Включите камеру', 'error');
+      toast.show(t('kyc_enable_camera'), 'error');
       return;
     }
     Haptic.medium();
@@ -101,11 +103,12 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
   const handleSubmit = async () => {
     if (!docFile || !selfieFile) return;
     if (!canSendDepositToTelegram()) {
-      toast.show('Отправка в Telegram не настроена', 'error');
+      toast.show(t('kyc_telegram_not_configured'), 'error');
       return;
     }
     setSubmitting(true);
-    const docLabel = DOC_TYPES.find((d) => d.id === docType)?.label ?? docType;
+    const docItem = DOC_TYPES.find((d) => d.id === docType);
+    const docLabel = docItem ? t(docItem.labelKey) : docType;
     const text =
       '🛡 ЗАЯВКА НА ВЕРИФИКАЦИЮ\n\n' +
       `👤 Пользователь: ${fullName || '—'}\n` +
@@ -118,9 +121,9 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
     if (result.ok) {
       setSubmittedOk(true);
       setStep('SUCCESS');
-      toast.show('Заявка отправлена. Ожидайте проверки.', 'success');
+      toast.show(t('kyc_sent_ok'), 'success');
     } else {
-      toast.show(result.error ?? 'Ошибка отправки', 'error');
+      toast.show(result.error ?? t('kyc_send_error'), 'error');
     }
   };
 
@@ -134,14 +137,14 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
         <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white mr-4 active:scale-90 transition-transform">
           <ArrowLeft size={24} />
         </button>
-        <span className="text-lg font-bold text-white">Верификация</span>
+        <span className="text-lg font-bold text-white">{t('verification')}</span>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4">
         {showProgress && (
           <div className="max-w-md mx-auto mb-6">
             <div className="flex justify-between text-xs text-neutral-500 mb-1.5">
-              <span>Шаг {stepIndex + 1} из {STEPS_ORDER.length - 1}</span>
+              <span>{t('kyc_step', { n: String(stepIndex + 1), total: String(STEPS_ORDER.length - 1) })}</span>
             </div>
             <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
               <div className="h-full bg-neon rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
@@ -153,8 +156,8 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
         {step === 'DOC_TYPE' && (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-white mb-1">Тип документа</h2>
-              <p className="text-neutral-500 text-sm">Выберите документ, который будете загружать</p>
+              <h2 className="text-xl font-bold text-white mb-1">{t('kyc_doc_type')}</h2>
+              <p className="text-neutral-500 text-sm">{t('kyc_doc_type_desc')}</p>
             </div>
             <div className="space-y-3">
               {DOC_TYPES.map((d) => (
@@ -167,8 +170,8 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                     <FileText size={22} className="text-neon" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="block font-semibold text-white">{d.label}</span>
-                    <span className="block text-xs text-neutral-500 mt-0.5">{d.desc}</span>
+                    <span className="block font-semibold text-white">{t(d.labelKey)}</span>
+                    <span className="block text-xs text-neutral-500 mt-0.5">{t(d.descKey)}</span>
                   </div>
                   <ChevronRight size={18} className="text-neutral-600 flex-shrink-0" />
                 </button>
@@ -180,19 +183,19 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
         {step === 'NAME' && (
           <div className="space-y-6">
             <div className="text-center mb-2">
-              <h2 className="text-xl font-bold text-white mb-1">ФИО как в документе</h2>
-              <p className="text-neutral-500 text-sm">Укажите полное имя без сокращений</p>
+              <h2 className="text-xl font-bold text-white mb-1">{t('kyc_name_title')}</h2>
+              <p className="text-neutral-500 text-sm">{t('kyc_name_desc')}</p>
             </div>
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4">
               <label className="flex items-center gap-2 text-xs text-neutral-500 uppercase font-bold mb-2">
                 <User size={14} />
-                Фамилия, имя, отчество
+                {t('kyc_fullname')}
               </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Иванов Иван Иванович"
+                placeholder={t('kyc_fullname_placeholder')}
                 className="w-full bg-neutral-900/50 border border-neutral-800 rounded-lg px-4 py-3 text-white placeholder-neutral-600 outline-none focus:border-neon/50 transition-colors"
               />
             </div>
@@ -201,10 +204,10 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               disabled={!fullName.trim()}
               className="w-full py-4 bg-neon text-black font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
             >
-              Далее <ChevronRight size={18} />
+              {t('next')} <ChevronRight size={18} />
             </button>
             <button onClick={() => { Haptic.light(); setStep('DOC_TYPE'); }} className="w-full text-neutral-500 text-sm py-2">
-              ← Назад
+              ← {t('back')}
             </button>
           </div>
         )}
@@ -212,8 +215,8 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
         {step === 'DOC_PHOTO' && (
           <div className="space-y-6">
             <div className="text-center mb-2">
-              <h2 className="text-xl font-bold text-white mb-1">Фото документа</h2>
-              <p className="text-neutral-500 text-sm">Разворот с фото и данными. Изображение должно быть чётким</p>
+              <h2 className="text-xl font-bold text-white mb-1">{t('kyc_doc_photo_title')}</h2>
+              <p className="text-neutral-500 text-sm">{t('kyc_doc_photo_desc')}</p>
             </div>
             <label className="block bg-[#0a0a0a] border-2 border-dashed border-neutral-700 rounded-2xl p-8 text-center cursor-pointer hover:border-neon/50 hover:bg-neutral-900/30 transition-all">
               <input
@@ -230,21 +233,21 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                   <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
                     <Check size={28} className="text-green-500" />
                   </div>
-                  <span className="text-green-500 font-medium">Документ загружен</span>
-                  <span className="text-neutral-500 text-xs">Нажмите, чтобы заменить</span>
+                  <span className="text-green-500 font-medium">{t('kyc_doc_uploaded')}</span>
+                  <span className="text-neutral-500 text-xs">{t('kyc_doc_replace')}</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center">
                     <Image size={28} className="text-neutral-500" />
                   </div>
-                  <span className="text-white font-medium">Загрузить фото</span>
-                  <span className="text-neutral-500 text-sm">или сфотографируйте документ</span>
+                  <span className="text-white font-medium">{t('kyc_upload_photo')}</span>
+                  <span className="text-neutral-500 text-sm">{t('kyc_or_photo')}</span>
                 </div>
               )}
             </label>
             <button onClick={() => setStep('NAME')} className="w-full text-neutral-500 text-sm py-2">
-              ← Назад
+              ← {t('back')}
             </button>
           </div>
         )}
@@ -252,8 +255,8 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
         {step === 'SELFIE' && (
           <div className="flex flex-col items-center">
             <div className="text-center mb-6 w-full">
-              <h2 className="text-xl font-bold text-white mb-1">Подтверждение личности</h2>
-              <p className="text-neutral-500 text-sm">Сделайте селфи — лицо должно быть чётко видно</p>
+              <h2 className="text-xl font-bold text-white mb-1">{t('kyc_selfie_title')}</h2>
+              <p className="text-neutral-500 text-sm">{t('kyc_selfie_desc')}</p>
             </div>
 
             {/* Превью снимка или видео с камеры */}
@@ -261,7 +264,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               {selfieFile && selfiePreviewUrl ? (
                 <img
                   src={selfiePreviewUrl}
-                  alt="Селфи"
+                  alt={t('kyc_selfie_alt')}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -276,7 +279,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               {!cameraOn && !selfieFile && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-900/90 text-neutral-500">
                   <Camera size={48} className="mb-3 opacity-60" />
-                  <span className="text-sm">Камера выключена</span>
+                  <span className="text-sm">{t('kyc_camera_off')}</span>
                 </div>
               )}
             </div>
@@ -289,7 +292,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                   onClick={startCamera}
                   className="w-full py-4 bg-neon text-black font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
                 >
-                  <Camera size={22} /> Включить камеру
+                  <Camera size={22} /> {t('kyc_turn_on_camera')}
                 </button>
               )}
               {cameraOn && !selfieFile && (
@@ -298,12 +301,12 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                   onClick={captureSelfie}
                   className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-green-600/20"
                 >
-                  <Camera size={22} /> Сделать снимок
+                  <Camera size={22} /> {t('kyc_take_photo')}
                 </button>
               )}
               {selfieFile && (
                 <>
-                  <p className="text-center text-green-500 text-sm mb-1">✓ Снимок готов</p>
+                  <p className="text-center text-green-500 text-sm mb-1">✓ {t('kyc_photo_ready')}</p>
                   <button
                     type="button"
                     onClick={handleSubmit}
@@ -311,10 +314,10 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                     className="w-full py-4 bg-neon text-black font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {submitting ? (
-                      'Отправка…'
+                      t('kyc_submitting')
                     ) : (
                       <>
-                        <Check size={22} /> Отправить данные на проверку
+                        <Check size={22} /> {t('kyc_submit')}
                       </>
                     )}
                   </button>
@@ -323,7 +326,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                     onClick={retakeSelfie}
                     className="w-full py-3 text-neutral-400 hover:text-white text-sm font-medium rounded-xl border border-neutral-700 hover:border-neutral-600 transition-colors"
                   >
-                    Переснять селфи
+                    {t('kyc_retake')}
                   </button>
                 </>
               )}
@@ -339,7 +342,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                   }}
                   className="w-full text-neutral-500 text-sm py-2"
                 >
-                  ← Назад к документу
+                  ← {t('kyc_back_doc')}
                 </button>
               )}
             </div>
@@ -353,25 +356,25 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
             </div>
             {submittedOk ? (
               <>
-                <h2 className="text-xl font-bold text-white mb-2">Заявка отправлена</h2>
-                <p className="text-neutral-500 text-sm mb-6">Данные переданы на проверку. Результат придёт в поддержку в Telegram.</p>
+                <h2 className="text-xl font-bold text-white mb-2">{t('kyc_success_title')}</h2>
+                <p className="text-neutral-500 text-sm mb-6">{t('kyc_success_desc')}</p>
                 <button onClick={() => { Haptic.tap(); onBack(); }} className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-[0.98]">
-                  В профиль
+                  {t('kyc_to_profile')}
                 </button>
               </>
             ) : (
               <>
-                <h2 className="text-xl font-bold text-white mb-2">Документ и селфи готовы</h2>
-                <p className="text-neutral-500 text-sm mb-6">Отправьте заявку в поддержку для проверки</p>
+                <h2 className="text-xl font-bold text-white mb-2">{t('kyc_docs_ready_title')}</h2>
+                <p className="text-neutral-500 text-sm mb-6">{t('kyc_docs_ready_desc')}</p>
                 <button
                   onClick={handleSubmit}
                   disabled={submitting}
                   className="w-full py-4 bg-neon text-black font-bold rounded-xl disabled:opacity-50 active:scale-[0.98]"
                 >
-                  {submitting ? 'Отправка…' : 'Отправить заявку'}
+                  {submitting ? t('kyc_submitting') : t('kyc_submit_btn')}
                 </button>
                 <button onClick={() => { setSelfieFile(null); setStep('SELFIE'); startCamera(); }} className="mt-3 text-neutral-500 text-sm">
-                  Переснять селфи
+                  {t('kyc_retake')}
                 </button>
               </>
             )}

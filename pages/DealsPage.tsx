@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Deal } from '../types';
 import { CheckCircle2, XCircle, Timer, TrendingUp, TrendingDown } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
+import { useCurrency } from '../context/CurrencyContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface DealsPageProps {
     deals: Deal[];
 }
 
 const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
+    const { formatPrice, symbol } = useCurrency();
+    const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
     const [now, setNow] = useState(Date.now());
 
@@ -34,7 +38,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
 
     return (
         <div className="flex flex-col h-full animate-fade-in px-4 pt-4">
-            <h1 className="text-xl font-bold text-white mb-4">Портфель сделок</h1>
+            <h1 className="text-xl font-bold text-white mb-4">{t('portfolio_title')}</h1>
 
             {/* Tabs */}
             <div className="flex bg-[#0a0a0a] rounded-lg p-1 mb-6 border border-white/5">
@@ -42,13 +46,13 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
                     onClick={() => { Haptic.tap(); setActiveTab('ACTIVE'); }}
                     className={`flex-1 py-2 text-xs font-medium rounded-md transition-all active:scale-[0.98] ${activeTab === 'ACTIVE' ? 'bg-neutral-800 text-white shadow' : 'text-neutral-500'}`}
                 >
-                    Активные ({activeDeals.length})
+                    {t('active_tab')} ({activeDeals.length})
                 </button>
                 <button 
                     onClick={() => { Haptic.tap(); setActiveTab('HISTORY'); }}
                     className={`flex-1 py-2 text-xs font-medium rounded-md transition-all active:scale-[0.98] ${activeTab === 'HISTORY' ? 'bg-neutral-800 text-white shadow' : 'text-neutral-500'}`}
                 >
-                    История ({historyDeals.length})
+                    {t('history_tab')} ({historyDeals.length})
                 </button>
             </div>
 
@@ -58,7 +62,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
                 {activeTab === 'ACTIVE' && activeDeals.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-40 text-neutral-600">
                         <Timer size={32} className="mb-2 opacity-20" />
-                        <span className="text-xs">Нет активных сделок</span>
+                        <span className="text-xs">{t('no_active')}</span>
                     </div>
                 )}
 
@@ -81,27 +85,27 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
                                     <div className="flex items-center space-x-1 mt-1">
                                         {deal.side === 'UP' ? <TrendingUp size={12} className="text-green-500" /> : <TrendingDown size={12} className="text-red-500" />}
                                         <span className={`text-xs font-bold ${deal.side === 'UP' ? 'text-green-500' : 'text-red-500'}`}>
-                                            {deal.side === 'UP' ? 'ВВЕРХ' : 'ВНИЗ'}
+                                            {deal.side === 'UP' ? t('up') : t('down')}
                                         </span>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end">
                                     <span className="text-xl font-mono text-white font-medium">{formatTimeLeft(deal)}</span>
-                                    <span className="text-[10px] text-neutral-500">осталось</span>
+                                    <span className="text-[10px] text-neutral-500">{t('left')}</span>
                                 </div>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-2 mt-2 pl-2">
                                 <div className="bg-neutral-900/50 rounded-lg p-2">
-                                    <span className="text-[10px] text-neutral-500 block">P&L (RUB)</span>
+                                    <span className="text-[10px] text-neutral-500 block">P&L</span>
                                     <span className={`text-sm font-mono font-bold ${isProfitable ? 'text-green-500' : 'text-red-500'}`}>
-                                        {isProfitable ? '+' : ''}{deal.pnl} ₽
+                                        {isProfitable ? '+' : ''}{formatPrice(deal.pnl ?? 0)} {symbol}
                                     </span>
                                 </div>
                                 <div className="bg-neutral-900/50 rounded-lg p-2">
-                                    <span className="text-[10px] text-neutral-500 block">Цена</span>
+                                    <span className="text-[10px] text-neutral-500 block">{t('price')}</span>
                                     <div className="flex items-center space-x-1">
-                                         <span className="text-sm font-mono text-white">{deal.currentPrice?.toFixed(2)}</span>
+                                         <span className="text-sm font-mono text-white">{deal.currentPrice != null ? formatPrice(deal.currentPrice) : '—'}</span>
                                          <span className={`text-[10px] font-mono ${priceDiff >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                             ({pricePercent > 0 ? '+' : ''}{pricePercent.toFixed(2)}%)
                                          </span>
@@ -110,8 +114,8 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
                             </div>
                             
                             <div className="flex justify-between items-center text-[10px] text-neutral-500 font-mono mt-3 pt-2 border-t border-dashed border-white/10 pl-2">
-                                <span>Вход: {deal.entryPrice.toFixed(2)}</span>
-                                <span>Сумма: {deal.amount} ₽</span>
+                                <span>{t('entry')}: {formatPrice(deal.entryPrice)}</span>
+                                <span>{t('sum')}: {formatPrice(deal.amount)} {symbol}</span>
                             </div>
                         </div>
                     );
@@ -119,7 +123,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
 
                 {activeTab === 'HISTORY' && historyDeals.length === 0 && (
                      <div className="flex flex-col items-center justify-center h-40 text-neutral-600">
-                        <span className="text-xs">История пуста</span>
+                        <span className="text-xs">{t('history_empty')}</span>
                     </div>
                 )}
 
@@ -138,7 +142,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals }) => {
                         <div className="flex flex-col items-end">
                             <div className="flex items-center space-x-1.5">
                                 <span className={`font-mono font-bold text-sm ${deal.status === 'WIN' ? 'text-green-500' : 'text-red-500'}`}>
-                                    {deal.status === 'WIN' ? '+' : ''}{deal.pnl} ₽
+                                    {deal.status === 'WIN' ? '+' : ''}{formatPrice(deal.pnl ?? 0)} {symbol}
                                 </span>
                                 {deal.status === 'WIN' ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-red-500" />}
                             </div>

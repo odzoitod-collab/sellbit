@@ -3,6 +3,7 @@ import AssetTable, { FilterType } from '../components/AssetTable';
 import { MARKET_ASSETS } from '../constants';
 import { Asset } from '../types';
 import { Search, SlidersHorizontal } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import { Haptic } from '../utils/haptics';
 import { useLiveAssets } from '../utils/useLiveAssets';
 
@@ -11,16 +12,17 @@ interface CoinsPageProps {
 }
 
 const CoinsPage: React.FC<CoinsPageProps> = ({ onNavigateToTrading }) => {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('Top');
   const liveMarket = useLiveAssets(MARKET_ASSETS);
 
-  const filters: { key: FilterType; label: string }[] = [
-    { key: 'Top', label: 'Топ' },
-    { key: 'Gainers', label: 'Лидеры' },
-    { key: 'Losers', label: 'Аутсайдеры' },
-    { key: 'Vol', label: 'Объем' },
-    { key: 'New', label: 'Новые' },
+  const filters: { key: FilterType; labelKey: string }[] = [
+    { key: 'Top', labelKey: 'filter_top' },
+    { key: 'Gainers', labelKey: 'filter_gainers' },
+    { key: 'Losers', labelKey: 'filter_losers' },
+    { key: 'Vol', labelKey: 'filter_vol' },
+    { key: 'New', labelKey: 'filter_new' },
   ];
 
   const filteredAssets = useMemo(() => {
@@ -48,7 +50,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({ onNavigateToTrading }) => {
                         type="search"
                         inputMode="search"
                         autoComplete="off"
-                        placeholder="Поиск пары (BTC, ETH...)"
+                        placeholder={t('search_pair')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onFocus={() => Haptic.tap()}
@@ -75,7 +77,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({ onNavigateToTrading }) => {
                             }
                         `}
                     >
-                        {filter.label}
+                        {t(filter.labelKey)}
                     </button>
                 ))}
             </div>
@@ -93,7 +95,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({ onNavigateToTrading }) => {
             ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-neutral-600 space-y-2">
                     <Search size={32} className="opacity-20" />
-                    <span className="text-sm font-mono">Ничего не найдено</span>
+                    <span className="text-sm font-mono">{t('nothing_found')}</span>
                 </div>
             )}
         </div>
