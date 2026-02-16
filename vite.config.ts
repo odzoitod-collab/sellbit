@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        allowedHosts: ['lbvmi-193-23-157-12.a.free.pinggy.link', 'elzjy-193-23-157-12.a.free.pinggy.link', 'favyp-193-23-157-12.a.free.pinggy.link', 'bdixl-193-23-157-12.a.free.pinggy.link'],
+        allowedHosts: ['sellbit-d66k.onrender.com'],
       },
       plugins: [react()],
       define: {

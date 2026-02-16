@@ -39,8 +39,8 @@ function LocaleCurrencySync() {
       const loc = (user.preferred_locale || 'en').toLowerCase();
       if (['en', 'ru', 'pl', 'kk', 'cs'].includes(loc)) setLocale(loc as 'en' | 'ru' | 'pl' | 'kk' | 'cs');
       const cur = (user.preferred_currency || 'USD').toLowerCase();
-      if (cur) setBaseCurrency(cur);
-    } else if (!tgid && !webUserId) {
+      setBaseCurrency(cur || 'usd');
+    } else {
       setLocale('en');
       setBaseCurrency('usd');
     }

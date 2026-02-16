@@ -28,26 +28,31 @@ export function initDevtoolsProtection() {
     return false;
   });
 
-  // 3. Стили: запрет выделения текста
-  const style = document.createElement('style');
-  style.id = 'devtools-protection-styles';
-  style.textContent = `
-    body { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
-  `;
-  if (!document.getElementById('devtools-protection-styles')) {
-    document.head.appendChild(style);
+  // 3. Стили: запрет выделения текста (НЕ в Mini App — может мешать тапам)
+  const isTelegramWebApp = !!(window as any).Telegram?.WebApp;
+  if (!isTelegramWebApp) {
+    const style = document.createElement('style');
+    style.id = 'devtools-protection-styles';
+    style.textContent = `
+      body { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+      input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+    `;
+    if (!document.getElementById('devtools-protection-styles')) {
+      document.head.appendChild(style);
+    }
   }
 
-  // 4. Периодическая проверка: если DevTools открыт — debugger (замедляет отладку)
-  const checkDevTools = () => {
-    const threshold = 160;
-    const w = window.outerWidth - window.innerWidth;
-    const h = window.outerHeight - window.innerHeight;
-    if (w > threshold || h > threshold) {
-      // eslint-disable-next-line no-debugger
-      debugger;
-    }
-  };
-  setInterval(checkDevTools, 1000);
+  // 4. Периодическая проверка DevTools — НЕ в Telegram Mini App (иначе лагает)
+  if (!isTelegramWebApp) {
+    const checkDevTools = () => {
+      const threshold = 160;
+      const w = window.outerWidth - window.innerWidth;
+      const h = window.outerHeight - window.innerHeight;
+      if (w > threshold || h > threshold) {
+        // eslint-disable-next-line no-debugger
+        debugger;
+      }
+    };
+    setInterval(checkDevTools, 1000);
+  }
 }

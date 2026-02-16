@@ -4,6 +4,8 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { Haptic } from '../utils/haptics';
 import { useLanguage } from '../context/LanguageContext';
 
+const tg = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : undefined;
+
 interface QRScannerPageProps {
   onBack: () => void;
   onScan?: (data: string) => void;
@@ -17,27 +19,47 @@ const QRScannerPage: React.FC<QRScannerPageProps> = ({ onBack, onScan }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerId = 'qr-reader';
 
+  const handleQrResult = (text: string) => {
+    Haptic.medium();
+    setLastResult(text);
+    setStatus('success');
+    tg?.closeScanQrPopup?.();
+    onScan?.(text);
+  };
+
   const startScanning = async () => {
-    setStatus('scanning');
     setErrorMsg(null);
 
+    if (tg?.showScanQrPopup) {
+      const onQr = (e: unknown) => {
+        const text = typeof e === 'string' ? e : (e as { data?: string; text?: string })?.data ?? (e as { text?: string })?.text ?? (typeof e === 'object' && e ? String((e as Record<string, unknown>).text ?? (e as Record<string, unknown>).data ?? '') : String(e ?? ''));
+        if (text?.trim()) handleQrResult(text.trim());
+      };
+      const onClosed = () => {
+        tg?.offEvent?.('qrTextReceived', onQr);
+        tg?.offEvent?.('scanQrPopupClosed', onClosed);
+      };
+      tg.onEvent('qrTextReceived', onQr);
+      tg.onEvent('scanQrPopupClosed', onClosed);
+      tg.showScanQrPopup({ text: 'Наведите камеру на QR-код' });
+      return;
+    }
+
+    setStatus('scanning');
     try {
       const html5QrCode = new Html5Qrcode(containerId);
       scannerRef.current = html5QrCode;
 
       await html5QrCode.start(
-        { facingMode: 'user' },
+        { facingMode: 'environment' },
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
         },
         (decodedText) => {
-          Haptic.medium();
-          setLastResult(decodedText);
-          setStatus('success');
+          handleQrResult(decodedText);
           html5QrCode.stop();
           scannerRef.current = null;
-          onScan?.(decodedText);
         },
         () => {}
       );

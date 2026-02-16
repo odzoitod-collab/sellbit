@@ -154,7 +154,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
                 <Languages size={16} className="text-neutral-500 group-hover:text-neon/80" />
                 <span className="text-xs font-medium text-neutral-300 group-hover:text-white">{t('language_title')}</span>
               </div>
-              <span className="text-[11px] text-neutral-500 font-mono">{locale === 'en' ? 'EN' : locale === 'ru' ? 'RU' : locale === 'pl' ? 'PL' : 'CS'}</span>
+              <span className="text-[11px] text-neutral-500 font-mono">{locale === 'en' ? 'EN' : locale === 'ru' ? 'RU' : locale === 'pl' ? 'PL' : locale === 'kk' ? 'KK' : 'CS'}</span>
               <ChevronRight size={14} className="text-neutral-600 -mr-1" />
             </button>
           )}

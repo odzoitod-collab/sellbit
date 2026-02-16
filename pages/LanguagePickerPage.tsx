@@ -2,6 +2,8 @@ import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import { useLanguage } from '../context/LanguageContext';
+import { useUser } from '../context/UserContext';
+import { supabase } from '../lib/supabase';
 import type { Locale } from '../i18n/translations';
 
 const LANGUAGES: { code: Locale; labelKey: string }[] = [
@@ -18,10 +20,18 @@ interface LanguagePickerPageProps {
 
 const LanguagePickerPage: React.FC<LanguagePickerPageProps> = ({ onBack }) => {
   const { locale, setLocale, t } = useLanguage();
+  const { user, tgid, webUserId, refreshUser } = useUser();
 
-  const handleSelect = (code: Locale) => {
+  const handleSelect = async (code: Locale) => {
     Haptic.light();
     setLocale(code);
+    const uid = user?.user_id;
+    if (uid) {
+      try {
+        await supabase.from('users').update({ preferred_locale: code }).eq('user_id', uid);
+        refreshUser?.();
+      } catch {}
+    }
     onBack();
   };
 

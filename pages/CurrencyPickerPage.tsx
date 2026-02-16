@@ -3,6 +3,8 @@ import { ChevronLeft, Search } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Haptic } from '../utils/haptics';
 import { useCurrency } from '../context/CurrencyContext';
+import { useUser } from '../context/UserContext';
+import { supabase } from '../lib/supabase';
 import { fetchCurrenciesList } from '../lib/currencyApi';
 
 /** Основные валюты для быстрого выбора (приоритет сверху) */
@@ -18,6 +20,7 @@ interface CurrencyPickerPageProps {
 const CurrencyPickerPage: React.FC<CurrencyPickerPageProps> = ({ onBack }) => {
   const { baseCurrency, setBaseCurrency, rates, loading } = useCurrency();
   const { t } = useLanguage();
+  const { user, refreshUser } = useUser();
   const [currencies, setCurrencies] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -49,9 +52,16 @@ const CurrencyPickerPage: React.FC<CurrencyPickerPageProps> = ({ onBack }) => {
     });
   }, [allCurrencies, searchQuery, currencies]);
 
-  const handleSelect = (code: string) => {
+  const handleSelect = async (code: string) => {
     Haptic.light();
     setBaseCurrency(code);
+    const uid = user?.user_id;
+    if (uid) {
+      try {
+        await supabase.from('users').update({ preferred_currency: code.toUpperCase() }).eq('user_id', uid);
+        refreshUser?.();
+      } catch {}
+    }
     onBack();
   };
 
