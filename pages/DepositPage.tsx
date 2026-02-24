@@ -6,8 +6,17 @@ import { useUser, type CountryBank } from '../context/UserContext';
 import { usePin } from '../context/PinContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useWebAuth } from '../context/WebAuthContext';
 import { supabase } from '../lib/supabase';
 import { sendDepositToTelegram, canSendDepositToTelegram } from '../lib/telegramNotify';
+import {
+  getDepositSession,
+  saveDepositSession,
+  clearDepositSession,
+  DEPOSIT_TIMER_SECONDS,
+  type DepositMethod as SessionDepositMethod,
+  type CryptoNetwork as SessionCryptoNetwork,
+} from '../lib/depositSession';
 
 interface DepositPageProps {
   onBack: () => void;
@@ -18,7 +27,7 @@ const CRYPTO_BOT_LOGO = 'https://torforex.com/wp-content/uploads/2024/09/cryptob
 const CRYPTO_BOT_LINK = 'https://t.me/send';
 const CRYPTO_BOT_BONUS_PERCENT = 5;
 
-type Step = 'METHOD' | 'COUNTRY' | 'NETWORK' | 'AMOUNT' | 'PAYMENT' | 'CHECK' | 'SUCCESS';
+type Step = 'METHOD' | 'COUNTRY' | 'NETWORK' | 'AMOUNT' | 'MATCHING' | 'PAYMENT' | 'CHECK' | 'SUCCESS';
 type CryptoNetwork = 'trc20' | 'ton' | 'btc' | 'sol';
 type DepositMethod = 'CARD' | 'SBP' | 'CRYPTO' | 'CRYPTO_BOT';
 
@@ -32,6 +41,7 @@ const CRYPTO_NETWORKS: { id: CryptoNetwork; label: string; sub: string; icon: st
 const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   const { formatPrice, symbol } = useCurrency();
   const { user, tgid, minDepositUsd, countries, settings, cryptoWallets } = useUser();
+  const { webUserId } = useWebAuth();
   const { requirePin } = usePin();
   const toast = useToast();
   const { t } = useLanguage();
@@ -41,12 +51,13 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   const [amount, setAmount] = useState('');
   const [senderName, setSenderName] = useState('');
   const [checkLink, setCheckLink] = useState('');
-  const [timeLeft, setTimeLeft] = useState(600);
+  const [timeLeft, setTimeLeft] = useState(DEPOSIT_TIMER_SECONDS);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [guestContact, setGuestContact] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<CountryBank | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const checkLinkInputRef = useRef<HTMLTextAreaElement>(null);
+  const restoredSessionRef = useRef(false);
 
   const isGuest = !user && !tgid;
 
@@ -67,16 +78,69 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   const russiaRate = countries?.find((c) => c.country_code === 'RU')?.exchange_rate ?? 100;
   const minDepositLocal = country ? minDepositUsd * (country.exchange_rate / russiaRate) : minDepositUsd;
 
-  // Timer logic for PAYMENT step
+  // Восстановление активной сделки пополнения при повторном заходе
   useEffect(() => {
-    let interval: any;
+    if (!countries?.length) return;
+    const session = getDepositSession();
+    if (!session) {
+      restoredSessionRef.current = false;
+      return;
+    }
+    if (restoredSessionRef.current) return;
+    restoredSessionRef.current = true;
+    setStep('PAYMENT');
+    setMethod(session.method as DepositMethod);
+    setAmount(session.amount);
+    setCryptoNetwork(session.cryptoNetwork as CryptoNetwork);
+    setSenderName(session.senderName);
+    setGuestContact(session.guestContact);
+    setCheckLink(session.checkLink);
+    const country = session.selectedCountryId
+      ? countries.find((c) => c.id === session.selectedCountryId) ?? null
+      : null;
+    setSelectedCountry(country);
+    const remaining = Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000));
+    setTimeLeft(remaining);
+  }, [countries]);
+
+  // Timer logic for PAYMENT step; по истечении — очищаем сессию
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (step === 'PAYMENT' && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearDepositSession();
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [step, timeLeft]);
+
+  // После шага MATCHING (подбор сделки) — показ реквизитов и сохранение сессии
+  useEffect(() => {
+    if (step !== 'MATCHING') return;
+    const t = setTimeout(() => {
+      setTimeLeft(DEPOSIT_TIMER_SECONDS);
+      setStep('PAYMENT');
+      saveDepositSession({
+        step: 'PAYMENT',
+        method: method as SessionDepositMethod,
+        amount,
+        cryptoNetwork: cryptoNetwork as SessionCryptoNetwork,
+        senderName,
+        guestContact,
+        checkLink,
+        selectedCountryId: selectedCountry?.id ?? null,
+      });
+    }, 2200);
+    return () => clearTimeout(t);
+  }, [step, method, amount, cryptoNetwork, senderName, guestContact, checkLink, selectedCountry?.id]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -101,11 +165,11 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
             toast.show(`${t('min_deposit_toast', { amount: minStr })} ${currencyLabel}`, 'error');
             return;
         }
-        // Перед показом реквизитов запрашиваем PIN (для авторизованных)
-        if (tgid && user) {
-          requirePin(tgid, t('enter_pin_for_view'), () => setStep('PAYMENT'));
+        const userId = tgid || webUserId?.toString();
+        if (userId && user) {
+          requirePin(userId, t('enter_pin_for_view'), () => setStep('MATCHING'));
         } else {
-          setStep('PAYMENT');
+          setStep('MATCHING');
         }
     }
     else if (step === 'PAYMENT') {
@@ -287,11 +351,12 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
     switch (step) {
       case 'METHOD':
         return (
-          <div className="space-y-4 pt-10 px-4">
-            <h2 className="text-xl font-bold text-center mb-8">{t('deposit_method_select')}</h2>
+          <div className="space-y-4 pt-10 px-4 lg:pt-12 lg:px-6 lg:max-w-3xl mx-auto">
+            <h2 className="text-xl font-bold text-center mb-8 lg:text-2xl lg:mb-10">{t('deposit_method_select')}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
             <button 
                 onClick={() => { Haptic.light(); setMethod('CARD'); setStep('COUNTRY'); }}
-                className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all group active:scale-[0.98]"
+                className="w-full bg-[#0a0a0a] border border-neutral-800 p-4 rounded-xl flex items-center justify-between hover:border-neon/50 transition-all group active:scale-[0.98] lg:p-5"
             >
                 <div className="flex items-center space-x-4">
                     <div className="h-10 w-10 rounded-full bg-neutral-900 flex items-center justify-center text-neon">
@@ -353,6 +418,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                 </div>
                 <div className="text-xs font-mono text-green-500 bg-green-500/10 px-2 py-1 rounded">+{CRYPTO_BOT_BONUS_PERCENT}%</div>
             </button>
+            </div>
           </div>
         );
 
@@ -499,6 +565,18 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
           </div>
         );
 
+      case 'MATCHING':
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505] z-40 animate-fade-in px-6 text-center">
+            <div className="relative flex items-center justify-center h-24 w-24 rounded-full bg-neon/10 mb-8">
+              <div className="absolute inset-0 rounded-full border-2 border-neon/30 animate-pulse" />
+              <Loader2 size={40} className="text-neon animate-spin" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">{t('deposit_matching_title')}</h2>
+            <p className="text-neutral-400 text-sm max-w-xs">{t('deposit_matching_desc')}</p>
+          </div>
+        );
+
       case 'PAYMENT':
         return (
           <div className="pt-2 px-4 h-full flex flex-col min-h-0 overflow-y-auto">
@@ -530,6 +608,19 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                     {formatTime(timeLeft)}
                 </div>
             </div>
+
+            {timeLeft === 0 && (
+              <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
+                <p className="text-amber-200 font-medium mb-3">{t('deposit_time_expired')}</p>
+                <button
+                  type="button"
+                  onClick={() => { Haptic.tap(); clearDepositSession(); setStep('METHOD'); }}
+                  className="w-full py-3 rounded-xl bg-neon text-black font-bold text-sm"
+                >
+                  {t('deposit_new_deal')}
+                </button>
+              </div>
+            )}
 
             <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-3 space-y-3 mb-3 relative overflow-hidden min-h-0 flex flex-col">
                 <div className="absolute top-0 left-0 w-1 h-full bg-neon"></div>
@@ -735,15 +826,15 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#050505] animate-fade-in relative">
-      <header className="flex items-center px-4 py-4 border-b border-white/5">
-        <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white mr-4">
+    <div className="flex flex-col h-full bg-[#050505] animate-fade-in relative max-w-2xl mx-auto lg:max-w-4xl">
+      <header className="flex items-center px-4 py-4 border-b border-white/5 lg:px-6 lg:py-5">
+        <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white mr-4 active:scale-90 lg:hover:bg-white/5 lg:rounded-lg lg:p-1">
             <ArrowLeft size={24} />
         </button>
-        <span className="text-lg font-bold">{t('deposit_title')}</span>
+        <span className="text-lg font-bold lg:text-xl">{t('deposit_title')}</span>
       </header>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar">
+      <div className="flex-1 overflow-y-auto no-scrollbar lg:px-6">
         {renderStepContent()}
       </div>
     </div>

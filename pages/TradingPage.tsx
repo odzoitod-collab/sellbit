@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Asset, Deal } from '../types';
 import { ArrowLeft, Clock, Zap, Check, X, ChevronDown, Info, TrendingUp, BarChart3, FileText } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
@@ -7,7 +7,10 @@ import { useUser } from '../context/UserContext';
 import { usePin } from '../context/PinContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useWebAuth } from '../context/WebAuthContext';
 import { getTradingViewSymbol, getTradingViewSymbolLabel } from '../utils/chartSymbol';
+import { fetchCryptoPricesInRub } from '../lib/cryptoPrices';
+import CoinsPage from './CoinsPage';
 
 const MIN_DEAL_RUB = 100;
 
@@ -17,6 +20,7 @@ interface TradingPageProps {
   tradingBlocked?: boolean;
   onBack: () => void;
   onOpenDeal: (deal: Deal) => void;
+  onChangeAsset?: (asset: Asset) => void;
 }
 
 type Tab = 'CHART' | 'TRADE' | 'RULES';
@@ -29,9 +33,10 @@ const TIMEFRAMES = [
     { label: '5м', sec: 300 },
 ];
 
-const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocked = false, onBack, onOpenDeal }) => {
+const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocked = false, onBack, onOpenDeal, onChangeAsset }) => {
   const toast = useToast();
   const { tgid } = useUser();
+  const { webUserId } = useWebAuth();
   const { requirePin } = usePin();
   const { formatPrice, convertFromRub, symbol, currencyCode } = useCurrency();
   const { t } = useLanguage();
@@ -41,6 +46,10 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
   const [duration, setDuration] = useState<number>(30);
   const [side, setSide] = useState<Side>('UP');
   const [livePrice, setLivePrice] = useState(asset?.price ?? 0);
+  const [showAssetSearch, setShowAssetSearch] = useState(false);
+
+  const prevLivePriceRef = useRef<number | null>(null);
+  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'flat'>('flat');
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -51,46 +60,65 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
 
   if (!asset) return <div className="p-10 text-center text-neutral-500">{t('asset_not_selected')}</div>;
 
-  // Живая цена в шапке
-  useEffect(() => {
-    setLivePrice(asset.price);
-    const t = setInterval(() => {
-      setLivePrice((p) => p * (1 + (Math.random() - 0.5) * 0.002));
-    }, 2500);
-    return () => clearInterval(t);
-  }, [asset.id, asset.price]);
+  const quote = (currencyCode || 'USD').toUpperCase();
+  const pairLabel = `${asset.ticker} ${quote}`;
 
-  // Живой стакан: обновляем каждые 2 сек от текущей базы (лёгкий рандом)
+  // Живая цена в шапке - обновляем из API каждые 10 секунд
   useEffect(() => {
-    const base = livePrice;
-    setOrderBookBase(base);
+    if (!asset) return;
+    
+    const updatePrice = async () => {
+      try {
+        const prices = await fetchCryptoPricesInRub([asset.ticker]);
+        if (prices[asset.ticker]) {
+          const next = prices[asset.ticker].price;
+          const prev = prevLivePriceRef.current;
+
+          if (prev == null) {
+            prevLivePriceRef.current = next;
+            setPriceDirection('flat');
+          } else if (next > prev) {
+            prevLivePriceRef.current = next;
+            setPriceDirection('up');
+          } else if (next < prev) {
+            prevLivePriceRef.current = next;
+            setPriceDirection('down');
+          } else {
+            prevLivePriceRef.current = next;
+            setPriceDirection('flat');
+          }
+
+          setLivePrice(next);
+        }
+      } catch (error) {
+        console.error('Failed to fetch price:', error);
+      }
+    };
+
+    // При смене актива: сбрасываем направление (первый тик будет нейтральным)
+    prevLivePriceRef.current = null;
+    setPriceDirection('flat');
+    setLivePrice(asset.price);
+    
+    // Обновляем цену каждые 10 секунд
+    updatePrice();
+    const t = setInterval(updatePrice, 10000);
+    return () => clearInterval(t);
+  }, [asset?.ticker, asset?.price]);
+
+  // Живой стакан: обновляем на основе реальной цены
+  useEffect(() => {
+    if (livePrice <= 0) return;
+    
+    setOrderBookBase(livePrice);
     const generate = (b: number, type: 'ask' | 'bid') =>
       Array.from({ length: 8 }).map((_, i) => {
         const diff = b * (0.0003 * (i + 1) + Math.random() * 0.0002);
         const price = type === 'ask' ? b + diff : b - diff;
         return { price, size: 0.5 + Math.random() * 2 };
       });
-    setAsks(generate(base, 'ask').reverse());
-    setBids(generate(base, 'bid'));
-  }, [asset]);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setOrderBookBase((prev) => {
-        const drift = asset.price * (0.0001 * (Math.random() - 0.5));
-        const newBase = prev + drift;
-        const generate = (b: number, type: 'ask' | 'bid') =>
-          Array.from({ length: 8 }).map((_, i) => {
-            const diff = b * (0.0003 * (i + 1) + Math.random() * 0.00015);
-            const price = type === 'ask' ? b + diff : b - diff;
-            return { price, size: 0.5 + Math.random() * 2 };
-          });
-        setAsks(generate(newBase, 'ask').reverse());
-        setBids(generate(newBase, 'bid'));
-        return newBase;
-      });
-    }, 2000);
-    return () => clearInterval(t);
+    setAsks(generate(livePrice, 'ask').reverse());
+    setBids(generate(livePrice, 'bid'));
   }, [livePrice]);
 
   const handlePreTrade = () => {
@@ -142,21 +170,33 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#050505] animate-fade-in relative overflow-hidden">
+    <div className="flex flex-col h-full bg-[#050505] animate-fade-in relative overflow-hidden max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto">
       {/* 1. Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-[#050505] border-b border-white/5 z-20">
+      <header className="flex items-center justify-between px-4 py-3 bg-[#050505] border-b border-white/5 z-20 lg:px-6 lg:py-4">
         <div className="flex items-center space-x-3">
             <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white active:scale-90 transition-transform">
                 <ArrowLeft size={20} />
             </button>
             <div className="flex flex-col">
                 <div className="flex items-center space-x-2">
-                    <span className="text-lg font-bold text-white tracking-wide">{getTradingViewSymbolLabel(asset.ticker)}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        Haptic.tap();
+                        setShowAssetSearch(true);
+                      }}
+                      className="text-lg font-bold text-white tracking-wide hover:text-neon transition-colors active:scale-[0.99]"
+                      aria-label={t('search_pair')}
+                    >
+                      {pairLabel}
+                    </button>
                 </div>
             </div>
         </div>
         <div className="flex items-center space-x-2">
-             <span className={`text-sm font-mono font-bold ${livePrice >= asset.price ? 'text-green-500' : 'text-red-500'}`}>
+             <span className={`text-sm font-mono font-bold ${
+               priceDirection === 'up' ? 'text-green-500' : priceDirection === 'down' ? 'text-red-500' : 'text-white'
+             }`}>
                 {formatPrice(livePrice)} {symbol}
             </span>
         </div>
@@ -463,7 +503,9 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
 
                 {/* Текущая цена (из живого стакана) */}
                 <div className="py-1.5 border-y border-white/5 flex flex-col items-center bg-[#050505] my-1">
-                    <span className={`text-sm font-mono font-bold ${orderBookBase >= asset.price ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`text-sm font-mono font-bold ${
+                      priceDirection === 'up' ? 'text-green-500' : priceDirection === 'down' ? 'text-red-500' : 'text-white'
+                    }`}>
                         {formatPrice(orderBookBase > 0 ? orderBookBase : asset.price)}
                     </span>
                     <span className="text-[8px] text-neutral-500">{currencyCode}</span>
@@ -531,8 +573,9 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     </button>
                     <button 
                         onClick={() => {
-                          if (tgid) {
-                            requirePin(tgid, t('enter_pin_for_confirm'), handleConfirmTrade);
+                          const userId = tgid || webUserId?.toString();
+                          if (userId) {
+                            requirePin(userId, t('enter_pin_for_confirm'), handleConfirmTrade);
                           } else {
                             handleConfirmTrade();
                           }
@@ -557,6 +600,32 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                  <h3 className="text-xl font-bold text-white tracking-wide">{t('deal_created')}</h3>
                  <p className="text-neutral-400 mt-2 text-sm font-mono">{t('going_to_portfolio')}</p>
             </div>
+        </div>
+      )}
+
+      {/* ASSET SEARCH OVERLAY */}
+      {showAssetSearch && (
+        <div className="fixed inset-0 z-[60] bg-[#050505] animate-fade-in">
+          <div className="h-full w-full max-w-md mx-auto relative">
+            <button
+              type="button"
+              onClick={() => { Haptic.tap(); setShowAssetSearch(false); }}
+              className="fixed top-3 right-3 z-[80] w-9 h-9 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-neutral-200 hover:text-white active:scale-95 transition-transform"
+              aria-label={t('close')}
+            >
+              <X size={18} />
+            </button>
+
+            <div className="h-full">
+              <CoinsPage
+                onNavigateToTrading={(a) => {
+                  Haptic.light();
+                  onChangeAsset?.(a);
+                  setShowAssetSearch(false);
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

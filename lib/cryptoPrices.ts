@@ -4,7 +4,7 @@
  */
 
 const CACHE_KEY = 'neonflow_crypto_prices';
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
+const CACHE_TTL_MS = 30 * 1000; // 30 секунд
 
 export interface CachedPrices {
   prices: Record<string, { price: number; change24h: number }>;
@@ -106,22 +106,29 @@ export interface CoinPriceData {
   change24h: number;
 }
 
+const FETCH_TIMEOUT_MS = 12_000;
+
 /**
  * Загружает цены и изменение за 24ч в рублях по списку тикеров.
  * Основной: Binance (USD → RUB). Резерв: CoinGecko.
+ * Таймаут запроса — не блокирует UI при лагах сети.
  */
 export async function fetchCryptoPricesInRub(
   tickers: string[]
 ): Promise<Record<string, CoinPriceData>> {
-  // 1. Binance (основной, надёжный)
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+
   try {
+    // 1. Binance (основной, надёжный)
     const symbols = tickers.map((t) => TICKER_TO_BINANCE[t.toUpperCase()]).filter(Boolean);
-    if (symbols.length === 0) throw new Error('No symbols');
+    if (symbols.length === 0) return {};
     const symbolsParam = encodeURIComponent(JSON.stringify(symbols));
     const [priceRes, rubRes] = await Promise.all([
-      fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbolsParam}`),
-      fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json'),
+      fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbolsParam}`, { signal: ac.signal }),
+      fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json', { signal: ac.signal }),
     ]);
+    clearTimeout(timeoutId);
     if (!priceRes.ok) throw new Error('Binance error');
     const rubData = rubRes.ok ? await rubRes.json() : { usd: { rub: 100 } };
     const usdToRub = rubData?.usd?.rub ?? 100;
@@ -138,14 +145,19 @@ export async function fetchCryptoPricesInRub(
       setCachedPrices(out);
       return out;
     }
-  } catch {}
+  } catch {
+    clearTimeout(timeoutId);
+  }
 
   // 2. CoinGecko (резерв)
+  const ac2 = new AbortController();
+  const t2 = setTimeout(() => ac2.abort(), FETCH_TIMEOUT_MS);
   try {
     const ids = tickers.map((t) => TICKER_TO_COINGECKO_ID[t.toUpperCase()]).filter(Boolean);
     if (ids.length === 0) return {};
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids.slice(0, 30).join(',')}&vs_currencies=rub&include_24hr_change=true`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: ac2.signal });
+    clearTimeout(t2);
     if (!res.ok) return {};
     const data: Record<string, { rub?: number; rub_24h_change?: number }> = await res.json();
     const out: Record<string, CoinPriceData> = {};
@@ -158,6 +170,7 @@ export async function fetchCryptoPricesInRub(
     if (Object.keys(out).length > 0) setCachedPrices(out);
     return out;
   } catch {
+    clearTimeout(t2);
     return {};
   }
 }

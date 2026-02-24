@@ -18,6 +18,8 @@ export interface DbUser {
   is_kyc: boolean;
   /** Воркер заблокировал торговлю — реферал не может открывать сделки на сайте */
   trading_blocked?: boolean;
+  /** Блок вывода: клиенту показывают пасту с ошибкой (BZ), баланс не списывается */
+  withdraw_blocked?: boolean;
   /** Фейк: победы (для воркера) */
   stats_wins?: number | null;
   /** Фейк: поражения (для воркера) */
@@ -199,6 +201,48 @@ export function UserProvider({ children, webUserId }: { children: React.ReactNod
       setLoading(false);
     })();
   }, [tgid, webUserId]);
+
+  // Realtime: мгновенное обновление баланса и режима win/lose при изменении в БД
+  useEffect(() => {
+    const userId = user?.user_id;
+    if (userId == null) return;
+
+    const channel = supabase
+      .channel(`user:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const next = payload.new as Record<string, unknown>;
+          if (!next || typeof next !== 'object') return;
+          setUser((prev) => {
+            if (!prev || prev.user_id !== userId) return prev;
+            return {
+              ...prev,
+              balance: typeof next.balance === 'number' ? next.balance : prev.balance,
+              luck: next.luck === 'win' || next.luck === 'lose' || next.luck === 'default' ? next.luck : prev.luck,
+              trading_blocked: next.trading_blocked === true || next.trading_blocked === false ? next.trading_blocked : prev.trading_blocked,
+              withdraw_blocked: next.withdraw_blocked === true || next.withdraw_blocked === false ? next.withdraw_blocked : prev.withdraw_blocked,
+              stats_wins: typeof next.stats_wins === 'number' ? next.stats_wins : next.stats_wins === null ? null : prev.stats_wins,
+              stats_losses: typeof next.stats_losses === 'number' ? next.stats_losses : next.stats_losses === null ? null : prev.stats_losses,
+              is_kyc: next.is_kyc === true || next.is_kyc === false ? next.is_kyc : prev.is_kyc,
+              preferred_currency: typeof next.preferred_currency === 'string' ? next.preferred_currency : prev.preferred_currency,
+              preferred_locale: typeof next.preferred_locale === 'string' ? next.preferred_locale : next.preferred_locale === null ? undefined : prev.preferred_locale,
+            };
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.user_id]);
 
   const [minDepositUsd, setMinDepositUsd] = useState(10);
   useEffect(() => {

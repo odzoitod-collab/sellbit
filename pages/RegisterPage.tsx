@@ -17,6 +17,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -29,12 +30,18 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
       return;
     }
     setEmail(trimmed);
+    setPassword('');
+    setConfirmPassword('');
     setStep('password');
   };
 
   const handlePasswordNext = () => {
     if (password.length < 6) {
       toast.show('Пароль должен быть не менее 6 символов', 'error');
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.show('Пароли не совпадают', 'error');
       return;
     }
     setStep('name');
@@ -61,7 +68,18 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
       <header className="flex items-center px-4 py-3 border-b border-white/[0.06] bg-[#050505]">
-        <button onClick={step === 'email' ? onBack : () => setStep(step === 'name' ? 'password' : 'email')} className="p-1.5 -ml-1.5 rounded-lg text-neutral-400 hover:text-white">
+        <button onClick={() => {
+          if (step === 'email') {
+            onBack();
+          } else if (step === 'password') {
+            setEmail('');
+            setPassword('');
+            setConfirmPassword('');
+            setStep('email');
+          } else if (step === 'name') {
+            setStep('password');
+          }
+        }} className="p-1.5 -ml-1.5 rounded-lg text-neutral-400 hover:text-white">
           <ArrowLeft size={20} strokeWidth={2} />
         </button>
         <span className="text-sm font-semibold text-white/90 ml-2">Регистрация — шаг {step === 'email' ? 1 : step === 'password' ? 2 : 3}</span>
@@ -100,6 +118,17 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
                   placeholder="Не менее 6 символов"
                   autoComplete="new-password"
                   autoFocus
+                  className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-500 mb-1.5">Подтвердите пароль</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Введите пароль еще раз"
+                  autoComplete="new-password"
                   className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
                 />
               </div>

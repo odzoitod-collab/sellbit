@@ -4,7 +4,7 @@
  */
 
 const RATES_CACHE_KEY = 'neonflow_usd_rates';
-const RATES_CACHE_TTL_MS = 30 * 60 * 1000; // 30 минут
+const RATES_CACHE_TTL_MS = 2 * 60 * 1000; // 2 минуты
 
 function getCachedRates(): UsdRates | null {
   try {

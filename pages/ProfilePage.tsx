@@ -4,6 +4,7 @@ import { Deal } from '../types';
 import { Haptic } from '../utils/haptics';
 import { useUser } from '../context/UserContext';
 import { usePin } from '../context/PinContext';
+import { usePasswordChange } from '../context/PasswordChangeContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { checkPin, setPin } from '../utils/pinStorage';
@@ -25,6 +26,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
   const { user, supportLink, tgid, webUserId } = useUser();
   const { logout } = useWebAuth();
   const { hasPin } = usePin();
+  const { setPasswordChangeActive } = usePasswordChange();
   const { symbol, currencyCode } = useCurrency();
   const { t, locale } = useLanguage();
   const toast = useToast();
@@ -34,6 +36,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
   const [repeatPinValue, setRepeatPinValue] = useState('');
   const [pinError, setPinError] = useState('');
   const newPinRef = React.useRef('');
+
+  // Управляем состоянием смены пароля для скрытия навигации
+  React.useEffect(() => {
+    setPasswordChangeActive(changePinStep !== null);
+  }, [changePinStep, setPasswordChangeActive]);
 
   const finishedDeals = deals.filter((d) => d.status === 'WIN' || d.status === 'LOSS');
   const winsFromDeals = finishedDeals.filter((d) => d.status === 'WIN').length;
@@ -50,18 +57,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
   const isGuest = !user;
 
   return (
-    <div className="flex flex-col h-full bg-[#050505] animate-fade-in">
-      <header className="flex items-center px-4 py-3 border-b border-white/[0.06] bg-[#050505] sticky top-0 z-50">
+    <div className="flex flex-col h-full bg-[#050505] animate-fade-in max-w-2xl lg:max-w-4xl mx-auto">
+      <header className="flex items-center px-4 py-3 border-b border-white/[0.06] bg-[#050505] sticky top-0 z-50 lg:px-6 lg:py-4">
         <button
           onClick={() => { Haptic.tap(); onBack(); }}
           className="p-1.5 -ml-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all"
         >
           <ArrowLeft size={20} strokeWidth={2} />
         </button>
-        <span className="text-sm font-semibold text-white/90 ml-2">{t('profile')}</span>
+        <span className="text-sm font-semibold text-white/90 ml-2 lg:text-base">{t('profile')}</span>
       </header>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4">
+      <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 lg:px-6 lg:py-6">
         {/* Компактная планка аватар + имя / веб: только email */}
         <div className="flex items-center gap-3 mb-6 py-2">
           {!isWebUser && (
@@ -172,7 +179,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
               <ChevronRight size={14} className="text-neutral-600 -mr-1" />
             </button>
           )}
-          {!isGuest && tgid && hasPin(tgid) && !webUserId && (
+          {!isGuest && tgid && hasPin(tgid) && (
+            <button
+              type="button"
+              onClick={() => {
+                Haptic.tap();
+                setChangePinStep('current');
+                setCurrentPinValue('');
+                setNewPinValue('');
+                setRepeatPinValue('');
+                setPinError('');
+              }}
+              className="w-full bg-white/[0.02] border border-white/[0.06] rounded-lg px-3 py-2.5 flex items-center justify-between group text-left hover:bg-white/[0.04] active:scale-[0.99] transition-all"
+            >
+              <div className="flex items-center gap-2.5">
+                <KeyRound size={16} className="text-neutral-500 group-hover:text-neon/80" />
+                <span className="text-xs font-medium text-neutral-300 group-hover:text-white">{t('change_password')}</span>
+              </div>
+              <ChevronRight size={14} className="text-neutral-600" />
+            </button>
+          )}
+          {!isGuest && webUserId && hasPin(webUserId.toString()) && (
             <button
               type="button"
               onClick={() => {
@@ -222,7 +249,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
       </div>
 
       {/* Модалка смены пароля */}
-      {changePinStep && tgid && (
+      {changePinStep && (tgid || webUserId) && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full bg-[#0d0d0d] border-t border-white/10 rounded-t-2xl px-5 pt-5 pb-8 max-w-md animate-slide-up">
             <div className="flex justify-between items-center mb-4">
@@ -250,15 +277,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
                   value={currentPinValue}
                   onChange={setCurrentPinValue}
                   onSubmit={async (pin) => {
-                    const ok = await checkPin(tgid, pin);
-                    if (ok) {
-                      setPinError('');
-                      setCurrentPinValue('');
-                      setChangePinStep('new');
-                    } else {
-                      Haptic.error();
-                      setPinError(t('pin_wrong'));
-                      setCurrentPinValue('');
+                    const userId = tgid || webUserId?.toString();
+                    if (userId) {
+                      const ok = await checkPin(userId, pin);
+                      if (ok) {
+                        setPinError('');
+                        setCurrentPinValue('');
+                        setChangePinStep('new');
+                      } else {
+                        Haptic.error();
+                        setPinError(t('pin_wrong'));
+                        setCurrentPinValue('');
+                      }
                     }
                   }}
                   error={!!pinError}
@@ -293,10 +323,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
                       return;
                     }
                     setPinError('');
-                    await setPin(tgid, pin);
-                    Haptic.success();
-                    toast.show(t('pin_changed'), 'success');
-                    setChangePinStep(null);
+                    const userId = tgid || webUserId?.toString();
+                    if (userId) {
+                      await setPin(userId, pin);
+                      Haptic.success();
+                      toast.show(t('pin_changed'), 'success');
+                      setChangePinStep(null);
+                    }
                   }}
                   error={!!pinError}
                 />
@@ -310,7 +343,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ deals, onBack, onNavigateToKy
                     setNewPinValue('');
                     setPinError('');
                   }}
-                  className="mt-4 text-xs text-neutral-500 hover:text-white w-full"
+                  className="mt-6 text-sm text-neutral-500 hover:text-white"
                 >
                   {t('back')}
                 </button>

@@ -27,6 +27,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import { CurrencyProvider, useCurrency } from './context/CurrencyContext';
 import { useWebAuth } from './context/WebAuthContext';
+import { PasswordChangeProvider, usePasswordChange } from './context/PasswordChangeContext';
 
 /** Синхронизирует язык и валюту с данными пользователя */
 function LocaleCurrencySync() {
@@ -96,9 +97,18 @@ function calculateTradeResult(
 type AuthSubPage = null | 'login' | 'register';
 
 const App: React.FC = () => {
+  return (
+    <PasswordChangeProvider>
+      <AppContent />
+    </PasswordChangeProvider>
+  );
+};
+
+const AppContent: React.FC = () => {
   const { user, tgid, webUserId, loading, error, refreshUser } = useUser();
   const { hasPin } = usePin();
   const { webUserId: webId } = useWebAuth();
+  const { passwordChangeActive } = usePasswordChange();
   const toast = useToast();
   const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState<PageView>('HOME');
@@ -107,6 +117,7 @@ const App: React.FC = () => {
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [pinCreated, setPinCreated] = useState(false);
   const [authSubPage, setAuthSubPage] = useState<AuthSubPage>(null);
+  const [hideNavigation, setHideNavigation] = useState(false);
 
   const refId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
   // Требуем вход/регистрацию при любом заходе не через TG (не mini app, не бота)
@@ -116,6 +127,15 @@ const App: React.FC = () => {
   userLuckRef.current = user?.luck ?? 'default';
 
   const balance = user?.balance ?? 0;
+
+  // Управляем видимостью навигации при создании PIN или смене пароля
+  useEffect(() => {
+    const showingPinScreen = 
+      (tgid && user && !hasPin(tgid) && !pinCreated) ||
+      (webUserId && user && !hasPin(webUserId.toString()) && !pinCreated);
+    
+    setHideNavigation(showingPinScreen || passwordChangeActive);
+  }, [tgid, webUserId, user, hasPin, pinCreated, passwordChangeActive]);
 
   // Загрузка сделок из БД
   useEffect(() => {
@@ -375,7 +395,23 @@ const App: React.FC = () => {
     return (
       <CreatePinScreen
         tgid={tgid}
-        onCreated={() => setPinCreated(true)}
+        onCreated={() => {
+          setPinCreated(true);
+          setHideNavigation(false);
+        }}
+      />
+    );
+  }
+
+  // Веб-пользователь: создание PIN при первом входе
+  if (webUserId && user && !hasPin(webUserId.toString()) && !pinCreated) {
+    return (
+      <CreatePinScreen
+        webUserId={webUserId}
+        onCreated={() => {
+          setPinCreated(true);
+          setHideNavigation(false);
+        }}
       />
     );
   }
@@ -402,6 +438,7 @@ const App: React.FC = () => {
             balance={balance}
             tradingBlocked={!!user?.trading_blocked}
             onBack={() => handleNavigate('HOME')}
+            onChangeAsset={handleNavigateToTrading}
             onOpenDeal={handleOpenDeal}
           />
         );
@@ -446,7 +483,7 @@ const App: React.FC = () => {
   return (
     <CurrencyProvider>
       <LocaleCurrencySync />
-      <Layout currentPage={currentPage} onNavigate={handleNavigate}>
+      <Layout currentPage={currentPage} onNavigate={handleNavigate} hideNavigation={hideNavigation}>
         {renderContent()}
       </Layout>
     </CurrencyProvider>

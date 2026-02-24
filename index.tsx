@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { initDevtoolsProtection } from './utils/devtoolsProtection';
 import { UserProvider } from './context/UserContext';
 import { WebAuthProvider, useWebAuth } from './context/WebAuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -23,8 +22,6 @@ function AppWithUser() {
     </UserProvider>
   );
 }
-
-initDevtoolsProtection();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

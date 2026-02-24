@@ -6,11 +6,12 @@ import PinKeypad, { PIN_LENGTH } from './PinKeypad';
 import { setPin } from '../utils/pinStorage';
 
 interface CreatePinScreenProps {
-  tgid: string;
+  tgid?: string;
+  webUserId?: number;
   onCreated: () => void;
 }
 
-const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, onCreated }) => {
+const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, webUserId, onCreated }) => {
   const { t } = useLanguage();
   const [step, setStep] = useState<'first' | 'repeat'>('first');
   const [firstPin, setFirstPin] = useState('');
@@ -35,7 +36,10 @@ const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, onCreated }) =>
       return;
     }
     setError('');
-    await setPin(tgid, pin);
+    const userId = tgid || webUserId?.toString();
+    if (userId) {
+      await setPin(userId, pin);
+    }
     Haptic.success();
     onCreated();
   };

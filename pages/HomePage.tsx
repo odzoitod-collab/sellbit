@@ -50,8 +50,7 @@ const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading,
   }, []);
 
   return (
-    <div className="flex flex-col min-h-full animate-fade-in">
-      {/* Pass state to header to toggle title */}
+    <div className="flex flex-col min-h-full animate-fade-in px-4 lg:px-6 lg:max-w-4xl mx-auto">
       <HomeHeader 
         showBalanceTitle={isBalanceHidden} 
         balance={balance} 
@@ -60,15 +59,13 @@ const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading,
         onProfileClick={() => onNavigate('PROFILE')}
       />
       
-      {/* Wrap BalanceDisplay in a ref div to track scrolling */}
       <div ref={balanceRef} className="opacity-100 transition-opacity duration-300">
         <BalanceDisplay balance={balance} onCurrencyClick={onCurrencyClick} />
       </div>
 
       <QuickActions onNavigate={onNavigate} />
 
-      {/* Полоска как на бирже: объём 24ч + статус */}
-      <div className="px-4 mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+      <div className="px-0 mt-2 flex items-center justify-between text-[11px] text-neutral-500">
         <span className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
           {t('all_systems_ok')}
@@ -76,11 +73,11 @@ const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading,
         <span className="font-mono">{t('vol_24h')}: {(convertFromRub(12.4e9) / 1e9).toFixed(1)} {symbol}</span>
       </div>
 
-      <div className="px-4 mt-3">
+      <div className="mt-3">
         <MarketTicker />
       </div>
       
-      <div className="mt-4 flex-1 px-4 pb-28">
+      <div className="mt-4 flex-1 pb-28 lg:pb-12">
         <AssetTable assets={liveAssets} onAssetClick={onNavigateToTrading} />
       </div>
     </div>

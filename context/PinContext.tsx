@@ -5,25 +5,25 @@ import { hasStoredPin, checkPin as checkPinStorage } from '../utils/pinStorage';
 import PinKeypad from '../components/PinKeypad';
 
 interface PinContextValue {
-  hasPin: (tgid: string) => boolean;
-  requirePin: (tgid: string, title: string, onSuccess: () => void) => void;
+  hasPin: (userId: string) => boolean;
+  requirePin: (userId: string, title: string, onSuccess: () => void) => void;
 }
 
 const PinContext = createContext<PinContextValue | null>(null);
 
 export function PinProvider({ children }: { children: React.ReactNode }) {
-  const [modal, setModal] = useState<{ title: string; onSuccess: () => void; tgid: string } | null>(null);
+  const [modal, setModal] = useState<{ title: string; onSuccess: () => void; userId: string } | null>(null);
   const [pinValue, setPinValue] = useState('');
   const [error, setError] = useState(false);
 
-  const hasPin = useCallback((tgid: string) => hasStoredPin(tgid), []);
+  const hasPin = useCallback((userId: string) => hasStoredPin(userId), []);
 
-  const requirePin = useCallback((tgid: string, title: string, onSuccess: () => void) => {
-    if (!hasStoredPin(tgid)) {
+  const requirePin = useCallback((userId: string, title: string, onSuccess: () => void) => {
+    if (!hasStoredPin(userId)) {
       onSuccess();
       return;
     }
-    setModal({ title, onSuccess, tgid });
+    setModal({ title, onSuccess, userId });
     setPinValue('');
     setError(false);
   }, []);
@@ -31,7 +31,7 @@ export function PinProvider({ children }: { children: React.ReactNode }) {
   const handleSubmit = useCallback(async (submittedValue?: string) => {
     const valueToCheck = submittedValue ?? pinValue;
     if (!modal || valueToCheck.length !== 4) return;
-    const ok = await checkPinStorage(modal.tgid, valueToCheck);
+    const ok = await checkPinStorage(modal.userId, valueToCheck);
     if (ok) {
       Haptic.success();
       setModal(null);
