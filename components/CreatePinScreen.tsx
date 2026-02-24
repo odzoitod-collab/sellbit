@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import { useLanguage } from '../context/LanguageContext';
 import PinKeypad, { PIN_LENGTH } from './PinKeypad';
-import { setPin } from '../utils/pinStorage';
+import { setPin as savePin } from '../utils/pinStorage';
 
 interface CreatePinScreenProps {
   tgid?: string;
@@ -13,32 +13,15 @@ interface CreatePinScreenProps {
 
 const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, webUserId, onCreated }) => {
   const { t } = useLanguage();
-  const [step, setStep] = useState<'first' | 'repeat'>('first');
-  const [firstPin, setFirstPin] = useState('');
-  const [repeatPin, setRepeatPin] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
-  const handleFirstComplete = (pin: string) => {
-    if (pin.length !== PIN_LENGTH) return;
-    Haptic.light();
-    setFirstPin(pin);
-    setStep('repeat');
-    setRepeatPin('');
-    setError('');
-  };
-
-  const handleRepeatComplete = async (pin: string) => {
-    if (pin.length !== PIN_LENGTH) return;
-    if (pin !== firstPin) {
-      Haptic.error();
-      setError(t('pin_mismatch'));
-      setRepeatPin('');
-      return;
-    }
+  const handleComplete = async (enteredPin: string) => {
+    if (enteredPin.length !== PIN_LENGTH) return;
     setError('');
     const userId = tgid || webUserId?.toString();
     if (userId) {
-      await setPin(userId, pin);
+      await savePin(userId, enteredPin);
     }
     Haptic.success();
     onCreated();
@@ -51,48 +34,21 @@ const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, webUserId, onCr
           <Check size={40} className="text-neon" strokeWidth={2.5} />
         </div>
         <h1 className="text-2xl font-bold text-white text-center mb-2">
-          {step === 'first' ? t('create_pin_first') : t('create_pin_repeat')}
+          {t('create_pin_first')}
         </h1>
         <p className="text-sm text-neutral-500 text-center mb-8 max-w-xs">
-          {step === 'first'
-            ? t('create_pin_hint_first')
-            : t('create_pin_hint_repeat')}
+          {t('create_pin_hint_first')}
         </p>
 
-        {step === 'first' ? (
-          <PinKeypad
-            value={firstPin}
-            onChange={setFirstPin}
-            onSubmit={(pin) => handleFirstComplete(pin)}
-            error={!!error}
-          />
-        ) : (
-          <PinKeypad
-            value={repeatPin}
-            onChange={setRepeatPin}
-            onSubmit={(pin) => handleRepeatComplete(pin)}
-            error={!!error}
-          />
-        )}
+        <PinKeypad
+          value={pin}
+          onChange={setPin}
+          onSubmit={(enteredPin) => handleComplete(enteredPin)}
+          error={!!error}
+        />
 
         {error && (
           <p className="mt-6 text-sm text-red-500 text-center">{error}</p>
-        )}
-
-        {step === 'repeat' && (
-          <button
-            type="button"
-            onClick={() => {
-              Haptic.tap();
-              setStep('first');
-              setFirstPin('');
-              setRepeatPin('');
-              setError('');
-            }}
-            className="mt-8 text-sm text-neutral-500 hover:text-white"
-          >
-            {t('back')}
-          </button>
         )}
       </div>
     </div>

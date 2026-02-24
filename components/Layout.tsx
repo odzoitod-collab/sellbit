@@ -11,7 +11,7 @@ interface LayoutProps {
   hideNavigation?: boolean;
 }
 
-const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['KYC', 'DEPOSIT', 'WITHDRAW', 'CURRENCY', 'LANGUAGE'];
+const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['KYC', 'CURRENCY', 'LANGUAGE'];
 
 const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hideNavigation = false }) => {
   const { keyboardOpen } = useKeyboard();

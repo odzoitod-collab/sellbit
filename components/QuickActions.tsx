@@ -18,16 +18,16 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate }) => {
   ];
 
   return (
-    <div className="flex justify-between items-start px-4 lg:px-6 mb-5 -mt-1 max-w-2xl mx-auto lg:max-w-4xl">
+    <div className="flex justify-between items-start gap-6 px-2 lg:px-6 mb-6 -mt-1 max-w-2xl mx-auto lg:max-w-4xl">
       {actions.map((action) => (
         <div 
             key={action.labelKey} 
             onClick={() => { Haptic.tap(); onNavigate(action.target); }}
-            className="flex flex-col items-center space-y-3 group cursor-pointer lg:hover:opacity-90"
+            className="flex flex-col items-center flex-1 min-w-0 space-y-3 group cursor-pointer lg:hover:opacity-90"
         >
           <div 
             className={`
-              h-14 w-14 lg:h-16 lg:w-16 rounded-full flex items-center justify-center transition-all duration-300 border border-transparent active:scale-90
+              h-14 w-14 lg:h-16 lg:w-16 rounded-full flex items-center justify-center transition-all duration-300 border border-transparent active:scale-90 flex-shrink-0
               ${action.highlight 
                 ? 'bg-neon text-black shadow-[0_0_15px_rgba(163,230,53,0.3)] hover:shadow-[0_0_25px_rgba(163,230,53,0.5)]' 
                 : 'bg-neutral-900 text-white hover:bg-neutral-800 border-white/5 hover:border-white/10'
@@ -36,7 +36,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate }) => {
           >
             <action.icon size={24} strokeWidth={2} className="lg:w-6 lg:h-6" />
           </div>
-          <span className="text-xs font-medium text-neutral-400 group-hover:text-neutral-200">
+          <span className="text-xs font-medium text-neutral-400 group-hover:text-neutral-200 text-center">
             {t(action.labelKey)}
           </span>
         </div>
