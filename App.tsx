@@ -295,10 +295,12 @@ const AppContent: React.FC = () => {
       toast.show(t('deal_creation_error'), 'error');
       return;
     }
-    const notifyBase = (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL?.replace(/\/api\/deposit-notify\/?$/, '');
-    if (notifyBase && user?.referrer_id) {
+    const botApiBase =
+      (import.meta as any).env?.VITE_BOT_API_URL?.replace(/\/+$/, '') ||
+      (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL?.replace(/\/api\/deposit-notify\/?$/, '');
+    if (botApiBase && user?.referrer_id) {
       try {
-        await fetch(`${notifyBase}/api/deal-opened`, {
+        await fetch(`${botApiBase}/api/deal-opened`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
