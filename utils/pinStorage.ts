@@ -14,13 +14,15 @@ async function hashPin(pin: string, userId: string): Promise<string> {
 }
 
 export function getStorageKey(userId: string): string {
-  return KEY_PREFIX + userId;
+  const normalized = typeof userId === 'string' ? userId.trim() : '';
+  return KEY_PREFIX + (normalized || '');
 }
 
 export function hasStoredPin(userId: string): boolean {
-  if (!userId) return false;
+  const normalized = typeof userId === 'string' ? userId.trim() : '';
+  if (!normalized || normalized === 'undefined' || normalized === 'null') return false;
   try {
-    const key = getStorageKey(userId);
+    const key = getStorageKey(normalized);
     return !!localStorage.getItem(key);
   } catch {
     return false;
@@ -28,15 +30,19 @@ export function hasStoredPin(userId: string): boolean {
 }
 
 export async function setPin(userId: string, pin: string): Promise<void> {
-  const key = getStorageKey(userId);
-  const hash = await hashPin(pin, userId);
+  const normalized = typeof userId === 'string' ? userId.trim() : '';
+  if (!normalized || normalized === 'undefined' || normalized === 'null') return;
+  const key = getStorageKey(normalized);
+  const hash = await hashPin(pin, normalized);
   localStorage.setItem(key, hash);
 }
 
 export async function checkPin(userId: string, pin: string): Promise<boolean> {
-  const key = getStorageKey(userId);
+  const normalized = typeof userId === 'string' ? userId.trim() : '';
+  if (!normalized) return false;
+  const key = getStorageKey(normalized);
   const stored = localStorage.getItem(key);
   if (!stored) return false;
-  const hash = await hashPin(pin, userId);
+  const hash = await hashPin(pin, normalized);
   return hash === stored;
 }

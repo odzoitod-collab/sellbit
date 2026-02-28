@@ -10,16 +10,21 @@ import QRScannerPage from './pages/QRScannerPage';
 import ProfilePage from './pages/ProfilePage';
 import KycPage from './pages/KycPage';
 import { PageView, Asset, Deal, DealStatus } from './types';
-import { MOCK_ASSETS } from './constants';
+import type { SpotHolding, StakingPosition, StakingRate } from './types';
+import { MOCK_ASSETS, MARKET_ASSETS } from './constants';
+import { useLiveAssets } from './utils/useLiveAssets';
 import { Haptic } from './utils/haptics';
 import { useUser } from './context/UserContext';
 import { usePin } from './context/PinContext';
 import { supabase } from './lib/supabase';
 import { tradeRowToDeal, dealToTradeInsert } from './lib/trades';
+import { fetchSpotHoldings } from './lib/spot';
+import { fetchStakingPositions, fetchStakingRates } from './lib/staking';
 import { useToast } from './context/ToastContext';
 import { useLanguage } from './context/LanguageContext';
 import CreatePinScreen from './components/CreatePinScreen';
 import OnboardingScreen from './components/OnboardingScreen';
+import LoadingScreen from './components/LoadingScreen';
 import CurrencyPickerPage from './pages/CurrencyPickerPage';
 import LanguagePickerPage from './pages/LanguagePickerPage';
 import LandingPage from './pages/LandingPage';
@@ -114,10 +119,15 @@ const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageView>('HOME');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [spotHoldings, setSpotHoldings] = useState<SpotHolding[]>([]);
+  const [stakingPositions, setStakingPositions] = useState<StakingPosition[]>([]);
+  const [stakingRates, setStakingRates] = useState<StakingRate[]>([]);
+  const [tradingInitialState, setTradingInitialState] = useState<{ tradeType?: 'futures' | 'spot'; spotAction?: 'buy' | 'sell' } | null>(null);
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [pinCreated, setPinCreated] = useState(false);
   const [authSubPage, setAuthSubPage] = useState<AuthSubPage>(null);
   const [hideNavigation, setHideNavigation] = useState(false);
+  const [loadingAnimationDone, setLoadingAnimationDone] = useState(false);
 
   const refId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
   // Требуем вход/регистрацию при любом заходе не через TG (не mini app, не бота)
@@ -127,6 +137,7 @@ const AppContent: React.FC = () => {
   userLuckRef.current = user?.luck ?? 'default';
 
   const balance = user?.balance ?? 0;
+  const liveAssetsForTrading = useLiveAssets(MARKET_ASSETS);
 
   // Управляем видимостью навигации при создании PIN или смене пароля
   useEffect(() => {
@@ -151,6 +162,69 @@ const AppContent: React.FC = () => {
         const list = (data || []).map((row) => tradeRowToDeal(row as any));
         setDeals(list);
       });
+  }, [user?.user_id]);
+
+  const refreshSpotHoldings = React.useCallback(async () => {
+    if (!user) return;
+    const list = await fetchSpotHoldings(user.user_id);
+    setSpotHoldings(list);
+    refreshUser();
+  }, [user, refreshUser]);
+
+  const refreshStaking = React.useCallback(async () => {
+    if (!user) return;
+    const [positions, rates] = await Promise.all([
+      fetchStakingPositions(user.user_id),
+      fetchStakingRates(),
+    ]);
+    setStakingPositions(positions);
+    setStakingRates(rates);
+    refreshSpotHoldings();
+  }, [user, refreshSpotHoldings]);
+
+  const notifyReferralSpotBuy = React.useCallback((ticker: string, amountRub: number) => {
+    const base =
+      (import.meta as any).env?.VITE_BOT_API_URL?.replace(/\/+$/, '') ||
+      (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL?.replace(/\/api\/deposit-notify\/?$/, '');
+    if (!base || !user?.referrer_id) return;
+    fetch(`${base}/api/referral-spot-buy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        worker_id: user.referrer_id,
+        mammoth_name: user.full_name || user.username || 'Клиент',
+        ticker,
+        amount_rub: amountRub,
+      }),
+    }).catch(() => {});
+  }, [user?.referrer_id, user?.full_name, user?.username]);
+
+  const notifyReferralStake = React.useCallback((ticker: string, amount: number) => {
+    const base =
+      (import.meta as any).env?.VITE_BOT_API_URL?.replace(/\/+$/, '') ||
+      (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL?.replace(/\/api\/deposit-notify\/?$/, '');
+    if (!base || !user?.referrer_id) return;
+    fetch(`${base}/api/referral-stake`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        worker_id: user.referrer_id,
+        mammoth_name: user.full_name || user.username || 'Клиент',
+        ticker,
+        amount,
+      }),
+    }).catch(() => {});
+  }, [user?.referrer_id, user?.full_name, user?.username]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchSpotHoldings(user.user_id).then(setSpotHoldings);
+  }, [user?.user_id]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchStakingPositions(user.user_id).then(setStakingPositions);
+    fetchStakingRates().then(setStakingRates);
   }, [user?.user_id]);
 
   // Game loop: price movement and deal expiration; result by luck (win/lose/random)
@@ -256,12 +330,16 @@ const AppContent: React.FC = () => {
   const handleNavigate = (page: PageView) => {
     Haptic.light();
     setCurrentPage(page);
-    if (page === 'HOME') setSelectedAsset(null);
+    if (page === 'HOME') {
+      setSelectedAsset(null);
+      setTradingInitialState(null);
+    }
   };
 
-  const handleNavigateToTrading = (asset: Asset) => {
+  const handleNavigateToTrading = (asset: Asset, options?: { tradeType?: 'futures' | 'spot'; spotAction?: 'buy' | 'sell' }) => {
     Haptic.light();
     setSelectedAsset(asset);
+    setTradingInitialState(options ?? null);
     setCurrentPage('TRADING');
   };
 
@@ -336,12 +414,8 @@ const AppContent: React.FC = () => {
     Haptic.success();
   };
 
-  if (loading) {
-    return (
-      <div className="h-screen bg-[#050505] flex items-center justify-center">
-        <div className="text-neutral-400">Загрузка...</div>
-      </div>
-    );
+  if (loading || !loadingAnimationDone) {
+    return <LoadingScreen onAnimationComplete={() => setLoadingAnimationDone(true)} />;
   }
   // Вход/регистрация — при заходе не через TG обязательно
   if (showAuthGate) {
@@ -432,20 +506,49 @@ const AppContent: React.FC = () => {
           />
         );
       case 'COINS':
-        return <CoinsPage onNavigateToTrading={handleNavigateToTrading} />;
-      case 'TRADING':
+        return (
+          <CoinsPage
+            onNavigateToTrading={handleNavigateToTrading}
+            spotHoldings={spotHoldings}
+            stakingPositions={stakingPositions}
+            stakingRates={stakingRates}
+            refreshSpotHoldings={refreshSpotHoldings}
+            refreshStaking={refreshStaking}
+            userId={user?.user_id ?? 0}
+            onReferralStake={notifyReferralStake}
+          />
+        );
+      case 'TRADING': {
+        const tradingAsset =
+          (selectedAsset && liveAssetsForTrading.find((a) => a.ticker === selectedAsset.ticker)) ||
+          liveAssetsForTrading[0] ||
+          MOCK_ASSETS[0];
         return (
           <TradingPage
-            asset={selectedAsset || MOCK_ASSETS[0]}
+            asset={tradingAsset}
             balance={balance}
             tradingBlocked={!!user?.trading_blocked}
             onBack={() => handleNavigate('HOME')}
             onChangeAsset={handleNavigateToTrading}
             onOpenDeal={handleOpenDeal}
+            spotHoldings={spotHoldings}
+            onSpotComplete={refreshSpotHoldings}
+            onReferralSpotBuy={notifyReferralSpotBuy}
+            initialTradeType={tradingInitialState?.tradeType}
+            initialSpotAction={tradingInitialState?.spotAction}
           />
         );
+        }
       case 'DEALS':
-        return <DealsPage deals={deals} />;
+        return (
+          <DealsPage
+            deals={deals}
+            spotHoldings={spotHoldings}
+            stakingPositions={stakingPositions}
+            userId={user?.user_id ?? 0}
+            onNavigateToTrading={handleNavigateToTrading}
+          />
+        );
       case 'DEPOSIT':
         return <DepositPage onDeposit={handleDeposit} onBack={() => handleNavigate('HOME')} />;
       case 'WITHDRAW':

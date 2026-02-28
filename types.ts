@@ -34,3 +34,38 @@ export interface Deal {
     status: DealStatus;
     pnl?: number; // Profit and Loss
 }
+
+/** Спотовая позиция: купленный актив (количество + средняя цена в рублях). */
+export interface SpotHolding {
+  ticker: string;
+  amount: number;
+  avgPriceRub: number;
+}
+
+/** Ставка стейкинга по монете (доходность в месяц, доля: 0.13 = 13%). */
+export interface StakingRate {
+  ticker: string;
+  ratePerMonth: number;
+}
+
+/** Позиция стейкинга: объём в стейке + накопленные проценты. */
+export interface StakingPosition {
+  ticker: string;
+  amount: number;
+  rewardsAccrued: number;
+  stakedAt: string;
+  lastAccrualTs: string;
+}
+
+/** Запись истории операций (покупка/продажа спот, стейкинг, вывод, сделка) — из БД. */
+export type ActivityType = 'spot_buy' | 'spot_sell' | 'stake' | 'unstake' | 'trade';
+
+export interface ActivityHistoryItem {
+  id: number;
+  activity_type: ActivityType;
+  ticker: string | null;
+  quantity: number | null;
+  amount_rub: number | null;
+  payload: Record<string, unknown> | null;
+  created_at: string;
+}

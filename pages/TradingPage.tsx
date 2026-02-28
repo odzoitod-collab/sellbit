@@ -10,6 +10,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { useWebAuth } from '../context/WebAuthContext';
 import { getTradingViewSymbol, getTradingViewSymbolLabel } from '../utils/chartSymbol';
 import { fetchCryptoPricesInRub } from '../lib/cryptoPrices';
+import { spotBuy, spotSell } from '../lib/spot';
+import type { SpotHolding } from '../types';
 import CoinsPage from './CoinsPage';
 
 const MIN_DEAL_RUB = 100;
@@ -21,6 +23,11 @@ interface TradingPageProps {
   onBack: () => void;
   onOpenDeal: (deal: Deal) => void;
   onChangeAsset?: (asset: Asset) => void;
+  spotHoldings?: SpotHolding[];
+  onSpotComplete?: () => void;
+  onReferralSpotBuy?: (ticker: string, amountRub: number) => void;
+  initialTradeType?: 'futures' | 'spot';
+  initialSpotAction?: 'buy' | 'sell';
 }
 
 type Tab = 'CHART' | 'TRADE' | 'RULES';
@@ -33,14 +40,31 @@ const TIMEFRAMES = [
     { label: '5м', sec: 300 },
 ];
 
-const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocked = false, onBack, onOpenDeal, onChangeAsset }) => {
+const TradingPage: React.FC<TradingPageProps> = ({
+  asset,
+  balance,
+  tradingBlocked = false,
+  onBack,
+  onOpenDeal,
+  onChangeAsset,
+  spotHoldings = [],
+  onSpotComplete,
+  onReferralSpotBuy,
+  initialTradeType,
+  initialSpotAction,
+}) => {
   const toast = useToast();
-  const { tgid } = useUser();
+  const { user, tgid } = useUser();
   const { webUserId } = useWebAuth();
   const { requirePin } = usePin();
   const { formatPrice, convertFromRub, symbol, currencyCode } = useCurrency();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>('TRADE');
+  const [tradeType, setTradeType] = useState<'futures' | 'spot'>(initialTradeType ?? 'futures');
+  const [spotAction, setSpotAction] = useState<'buy' | 'sell'>(initialSpotAction ?? 'buy');
+  const [spotAmountRub, setSpotAmountRub] = useState<string>('1000');
+  const [spotQuantity, setSpotQuantity] = useState<string>('');
+  const [spotLoading, setSpotLoading] = useState(false);
   const [leverage, setLeverage] = useState(10);
   const [amount, setAmount] = useState<string>('1000');
   const [duration, setDuration] = useState<number>(30);
@@ -53,10 +77,23 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showSpotConfirm, setShowSpotConfirm] = useState<'buy' | 'sell' | null>(null);
 
   const [asks, setAsks] = useState<{price: number, size: number}[]>([]);
   const [bids, setBids] = useState<{price: number, size: number}[]>([]);
   const [orderBookBase, setOrderBookBase] = useState(0);
+
+  const userIdNum = user?.user_id ?? (tgid ? Number(tgid) : webUserId ?? 0);
+  const currentHolding = spotHoldings.find((h) => h.ticker === asset?.ticker);
+  const holdingAmount = currentHolding?.amount ?? 0;
+
+  useEffect(() => {
+    if (initialTradeType) setTradeType(initialTradeType);
+    if (initialSpotAction) setSpotAction(initialSpotAction);
+    if (initialSpotAction === 'sell' && asset && currentHolding) {
+      setSpotQuantity(String(currentHolding.amount));
+    }
+  }, [initialTradeType, initialSpotAction, asset?.ticker, currentHolding?.amount]);
 
   if (!asset) return <div className="p-10 text-center text-neutral-500">{t('asset_not_selected')}</div>;
 
@@ -167,6 +204,60 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
           onOpenDeal(newDeal);
           setShowSuccess(false);
       }, 1500);
+  };
+
+  const handleSpotBuy = async () => {
+    if (!userIdNum || livePrice <= 0) return;
+    const amountRub = parseFloat(spotAmountRub) || 0;
+    if (amountRub < MIN_DEAL_RUB) {
+      toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_RUB) })} ${symbol}`, 'error');
+      return;
+    }
+    if (amountRub > balance) {
+      toast.show(t('insufficient_balance'), 'error');
+      return;
+    }
+    setSpotLoading(true);
+    const res = await spotBuy(userIdNum, asset.ticker, amountRub, livePrice);
+    setSpotLoading(false);
+    setShowSpotConfirm(null);
+    if (res.ok) {
+      toast.show(t('deal_created'), 'success');
+      onSpotComplete?.();
+      onReferralSpotBuy?.(asset.ticker, amountRub);
+    } else {
+      toast.show(res.error || t('deal_creation_error'), 'error');
+    }
+  };
+
+  const handleSpotSell = async () => {
+    if (!userIdNum || livePrice <= 0) return;
+    const qty = parseFloat(spotQuantity) || 0;
+    if (qty <= 0 || qty > holdingAmount) {
+      toast.show(t('insufficient_balance'), 'error');
+      return;
+    }
+    setSpotLoading(true);
+    const res = await spotSell(userIdNum, asset.ticker, qty, livePrice);
+    setSpotLoading(false);
+    setShowSpotConfirm(null);
+    if (res.ok) {
+      toast.show(t('deal_created'), 'success');
+      onSpotComplete?.();
+    } else {
+      toast.show(res.error || t('deal_creation_error'), 'error');
+    }
+  };
+
+  const handleSpotConfirmWithPin = () => {
+    const uid = tgid || webUserId?.toString();
+    if (showSpotConfirm === 'buy') {
+      if (uid) requirePin(uid, t('enter_pin_for_confirm'), handleSpotBuy);
+      else handleSpotBuy();
+    } else if (showSpotConfirm === 'sell') {
+      if (uid) requirePin(uid, t('enter_pin_for_confirm'), handleSpotSell);
+      else handleSpotSell();
+    }
   };
 
   return (
@@ -336,7 +427,205 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
             
             {/* LEFT COLUMN: Controls (60%) — компактно, без прокрутки */}
             <div className="w-[60%] h-full flex flex-col p-3 border-r border-white/5 overflow-y-auto no-scrollbar bg-[#050505]">
-                
+                {/* Фьючерсы / Спот */}
+                <div className="flex bg-[#0a0a0a] rounded-lg p-1 mb-3 border border-white/5">
+                    <button
+                        type="button"
+                        onClick={() => { Haptic.tap(); setTradeType('futures'); }}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${tradeType === 'futures' ? 'bg-neutral-800 text-white' : 'text-neutral-500'}`}
+                    >
+                        {t('trade_type_futures')}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { Haptic.tap(); setTradeType('spot'); }}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${tradeType === 'spot' ? 'bg-neutral-800 text-white' : 'text-neutral-500'}`}
+                    >
+                        {t('trade_type_spot')}
+                    </button>
+                </div>
+
+                {/* SPOT: Купить / Продать — в стиле фьючерсов */}
+                {tradeType === 'spot' && (
+                    <div className="space-y-3">
+                        {/* Направление: Купить / Продать */}
+                        <div className="space-y-0.5">
+                            <label className="text-[10px] text-neutral-500 uppercase font-bold">{t('direction')}</label>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { Haptic.tap(); setSpotAction('buy'); }}
+                                    className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all border
+                                        ${spotAction === 'buy'
+                                            ? 'bg-green-500/10 text-green-500 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.1)]'
+                                            : 'bg-[#0a0a0a] text-neutral-500 border-neutral-800 hover:border-neutral-700'
+                                        }`}
+                                >
+                                    {t('spot_buy')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { Haptic.tap(); setSpotAction('sell'); }}
+                                    className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all border
+                                        ${spotAction === 'sell'
+                                            ? 'bg-red-500/10 text-red-500 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.1)]'
+                                            : 'bg-[#0a0a0a] text-neutral-500 border-neutral-800 hover:border-neutral-700'
+                                        }`}
+                                >
+                                    {t('spot_sell')}
+                                </button>
+                            </div>
+                        </div>
+
+                        {spotAction === 'buy' && (
+                            <>
+                                {/* Сумма в валюте */}
+                                <div className="space-y-0.5">
+                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">{t('amount_label')} ({symbol})</label>
+                                    <div className="bg-[#0a0a0a] border border-neutral-800 rounded-lg px-3 py-1.5 flex items-center justify-between focus-within:border-neon/50 transition-colors">
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            value={spotAmountRub}
+                                            onChange={(e) => setSpotAmountRub(e.target.value)}
+                                            className="w-full bg-transparent text-white font-mono text-lg font-bold outline-none placeholder-neutral-700"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[500, 1000, 5000, 10000].map((v) => (
+                                            <button
+                                                key={v}
+                                                type="button"
+                                                onClick={() => { Haptic.tap(); setSpotAmountRub(String(v)); }}
+                                                className="px-2.5 py-1 rounded-md bg-white/5 text-neutral-400 text-xs font-mono hover:bg-white/10 hover:text-white active:scale-95"
+                                            >
+                                                {v >= 1000 ? v / 1000 + 'k' : v}
+                                            </button>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => { Haptic.tap(); setSpotAmountRub(String(Math.floor(balance * 0.5))); }}
+                                            className="px-2.5 py-1 rounded-md bg-white/5 text-neutral-400 text-xs font-mono hover:bg-white/10 hover:text-white active:scale-95"
+                                        >
+                                            50%
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { Haptic.tap(); const max = Math.max(MIN_DEAL_RUB, Math.floor(balance)); setSpotAmountRub(String(max)); }}
+                                            className="px-2.5 py-1 rounded-md bg-neon/20 text-neon text-xs font-mono font-bold hover:bg-neon/30 active:scale-95"
+                                        >
+                                            Max
+                                        </button>
+                                    </div>
+                                    <div className="text-[9px] text-neutral-600 px-1 flex items-center gap-2 flex-wrap">
+                                        <span>{t('available')}: {formatPrice(balance)} {symbol}</span>
+                                        <span className="flex items-center gap-0.5"><Info size={9} /> {t('min')}: {formatPrice(MIN_DEAL_RUB)} {symbol}</span>
+                                    </div>
+                                </div>
+                                {/* Расчёт: получите ≈ X {ticker} */}
+                                {livePrice > 0 && parseFloat(spotAmountRub) >= MIN_DEAL_RUB && (
+                                    <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
+                                        <span className="text-[10px] text-neutral-500 uppercase font-bold">{t('you_receive')}</span>
+                                        <span className="text-xs font-mono font-bold text-neon">
+                                            ≈ {(parseFloat(spotAmountRub) || 0) / livePrice > 0
+                                                ? ((parseFloat(spotAmountRub) || 0) / livePrice).toFixed(8)
+                                                : '0'} {asset.ticker}
+                                        </span>
+                                    </div>
+                                )}
+                                <p className="text-[9px] text-neutral-500 px-0.5 leading-tight">{t('spot_buy_note')}</p>
+                                <button
+                                    type="button"
+                                    disabled={spotLoading || tradingBlocked || (parseFloat(spotAmountRub) || 0) < MIN_DEAL_RUB}
+                                    onClick={() => { Haptic.tap(); setShowSpotConfirm('buy'); }}
+                                    className="w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-500 text-black shadow-green-500/20 hover:bg-green-400"
+                                >
+                                    {spotLoading ? '...' : t('spot_buy')}
+                                </button>
+                            </>
+                        )}
+
+                        {spotAction === 'sell' && (
+                            <>
+                                {/* Количество актива */}
+                                <div className="space-y-0.5">
+                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">{asset.ticker} — {t('amount_label')}</label>
+                                    <div className="bg-[#0a0a0a] border border-neutral-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2 focus-within:border-neon/50 transition-colors">
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            value={spotQuantity}
+                                            onChange={(e) => setSpotQuantity(e.target.value)}
+                                            className="flex-1 bg-transparent text-white font-mono text-lg font-bold outline-none placeholder-neutral-700"
+                                            placeholder="0"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => { Haptic.tap(); setSpotQuantity(holdingAmount > 0 ? holdingAmount.toFixed(8) : '0'); }}
+                                            className="px-2.5 py-1 rounded-md bg-neon/20 text-neon text-xs font-mono font-bold hover:bg-neon/30 active:scale-95"
+                                        >
+                                            Max
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[0.25, 0.5, 0.75, 1].map((pct) => (
+                                            <button
+                                                key={pct}
+                                                type="button"
+                                                onClick={() => {
+                                                    Haptic.tap();
+                                                    if (pct === 1) setSpotQuantity(holdingAmount > 0 ? holdingAmount.toFixed(8) : '0');
+                                                    else setSpotQuantity(String((holdingAmount * pct).toFixed(8)));
+                                                }}
+                                                className="px-2.5 py-1 rounded-md bg-white/5 text-neutral-400 text-xs font-mono hover:bg-white/10 hover:text-white active:scale-95"
+                                            >
+                                                {pct === 1 ? 'Max' : (pct * 100) + '%'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="text-[9px] text-neutral-600 px-1 flex items-center gap-2 flex-wrap">
+                                        <span>{t('available')}: {holdingAmount.toFixed(8)} {asset.ticker}</span>
+                                        {currentHolding && (
+                                            <span className="text-neutral-500">
+                                                ≈ {formatPrice(holdingAmount * currentHolding.avgPriceRub)} {symbol}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Расчёт: получите ≈ X {symbol} */}
+                                {livePrice > 0 && parseFloat(spotQuantity) > 0 && parseFloat(spotQuantity) <= holdingAmount && (
+                                    <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
+                                        <span className="text-[10px] text-neutral-500 uppercase font-bold">{t('you_receive')}</span>
+                                        <span className="text-xs font-mono font-bold text-neon">
+                                            ≈ {formatPrice((parseFloat(spotQuantity) || 0) * livePrice)} {symbol}
+                                        </span>
+                                    </div>
+                                )}
+                                <p className="text-[9px] text-neutral-500 px-0.5 leading-tight">{t('spot_sell_note')}</p>
+                                <button
+                                    type="button"
+                                    disabled={spotLoading || tradingBlocked || holdingAmount <= 0 || (parseFloat(spotQuantity) || 0) <= 0}
+                                    onClick={() => { Haptic.tap(); setShowSpotConfirm('sell'); }}
+                                    className="w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-500 text-black shadow-red-500/20 hover:bg-red-400"
+                                >
+                                    {spotLoading ? '...' : t('spot_sell')}
+                                </button>
+                            </>
+                        )}
+
+                        {tradingBlocked && (
+                            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px]">
+                                🔒 {t('trading_blocked')}.
+                            </div>
+                        )}
+                        <p className="text-[9px] text-neutral-500 mt-1 px-0.5 leading-tight">{t('trading_risk_note')}</p>
+                    </div>
+                )}
+
+                {/* FUTURES: сумма, плечо, время, Long/Short */}
+                {tradeType === 'futures' && (
+                <>
                 {/* Inputs */}
                 <div className="space-y-3">
                     
@@ -481,6 +770,8 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                 >
                     {tradingBlocked ? t('trading_blocked') : t('create_deal')}
                 </button>
+                </>
+                )}
             </div>
 
             {/* RIGHT COLUMN: Order Book (40%) */}
@@ -506,7 +797,7 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     <span className={`text-sm font-mono font-bold ${
                       priceDirection === 'up' ? 'text-green-500' : priceDirection === 'down' ? 'text-red-500' : 'text-white'
                     }`}>
-                        {formatPrice(orderBookBase > 0 ? orderBookBase : asset.price)}
+                        {formatPrice(orderBookBase > 0 ? orderBookBase : livePrice)}
                     </span>
                     <span className="text-[8px] text-neutral-500">{currencyCode}</span>
                 </div>
@@ -586,6 +877,78 @@ const TradingPage: React.FC<TradingPageProps> = ({ asset, balance, tradingBlocke
                     </button>
                 </div>
              </div>
+        </div>
+      )}
+
+      {/* SPOT CONFIRMATION MODAL */}
+      {showSpotConfirm && (
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full bg-[#111] border-t border-white/10 rounded-t-2xl p-6 animate-slide-up pb-safe">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-white">
+                {showSpotConfirm === 'buy' ? t('confirm_title') + ' — ' + t('spot_buy') : t('confirm_title') + ' — ' + t('spot_sell')}
+              </h3>
+              <button onClick={() => { Haptic.tap(); setShowSpotConfirm(null); }} className="text-neutral-500 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-neutral-400">{t('asset')}</span>
+                <span className="font-bold text-white">{asset.ticker}</span>
+              </div>
+              {showSpotConfirm === 'buy' && (
+                <>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-neutral-400">{t('amount_label')}</span>
+                    <span className="font-mono text-white">{formatPrice(parseFloat(spotAmountRub) || 0)} {symbol}</span>
+                  </div>
+                  {livePrice > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-neutral-400">{t('you_receive')}</span>
+                      <span className="font-mono text-neon">
+                        ≈ {((parseFloat(spotAmountRub) || 0) / livePrice).toFixed(8)} {asset.ticker}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+              {showSpotConfirm === 'sell' && (
+                <>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-neutral-400">{asset.ticker} — {t('amount_label')}</span>
+                    <span className="font-mono text-white">{spotQuantity || '0'}</span>
+                  </div>
+                  {livePrice > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-neutral-400">{t('you_receive')}</span>
+                      <span className="font-mono text-neon">
+                        ≈ {formatPrice((parseFloat(spotQuantity) || 0) * livePrice)} {symbol}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => { Haptic.tap(); setShowSpotConfirm(null); }}
+                className="flex-1 py-3 rounded-xl bg-neutral-800 text-white font-medium active:scale-95 transition-transform"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={() => {
+                  Haptic.tap();
+                  handleSpotConfirmWithPin();
+                }}
+                disabled={spotLoading}
+                className="flex-1 py-3 rounded-xl bg-neon text-black font-bold active:scale-95 transition-transform shadow-[0_0_15px_rgba(163,230,53,0.3)] disabled:opacity-50"
+              >
+                {spotLoading ? '...' : t('confirm')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

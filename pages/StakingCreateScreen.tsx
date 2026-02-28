@@ -1,0 +1,168 @@
+import React, { useState } from 'react';
+import { ArrowLeft, TrendingUp, Info } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { Haptic } from '../utils/haptics';
+import { stake } from '../lib/staking';
+
+interface StakingCreateScreenProps {
+  ticker: string;
+  maxAmount: number;
+  ratePerMonth: number;
+  userId: number;
+  pinUserId: string;
+  requirePin: (userId: string, message: string, callback: () => void) => void;
+  onClose: () => void;
+  onSuccess: (ticker: string, amount: number) => void;
+  onError: (msg: string) => void;
+}
+
+const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
+  ticker,
+  maxAmount,
+  ratePerMonth,
+  userId,
+  pinUserId,
+  requirePin,
+  onClose,
+  onSuccess,
+  onError,
+}) => {
+  const { t } = useLanguage();
+  const [amount, setAmount] = useState('');
+  const [step, setStep] = useState<'input' | 'confirm'>('input');
+  const [loading, setLoading] = useState(false);
+
+  const pct = Math.round(ratePerMonth * 100);
+  const numAmount = parseFloat(amount.replace(',', '.')) || 0;
+  const isValid = !isNaN(numAmount) && numAmount > 0 && numAmount <= maxAmount;
+
+  const handleConfirm = () => {
+    if (!isValid) {
+      onError(t('insufficient_spot') || 'Invalid amount');
+      return;
+    }
+    Haptic.tap();
+    setStep('confirm');
+  };
+
+  const handleCreateStaking = () => {
+    if (!isValid) return;
+    Haptic.tap();
+    requirePin(pinUserId, t('enter_pin_for_confirm'), async () => {
+      setLoading(true);
+      const res = await stake(userId, ticker, numAmount);
+      setLoading(false);
+      if (res.ok) {
+        Haptic.success();
+        onSuccess(ticker, numAmount);
+        onClose();
+      } else {
+        onError(res.error || t('deal_creation_error'));
+        Haptic.error();
+      }
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-[#050505] animate-fade-in overflow-hidden">
+      <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-[#050505]">
+        <button
+          type="button"
+          onClick={() => { Haptic.tap(); step === 'confirm' ? setStep('input') : onClose(); }}
+          className="p-2 -ml-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95"
+          aria-label={t('back')}
+        >
+          <ArrowLeft size={22} />
+        </button>
+        <h1 className="text-lg font-bold text-white font-mono flex-1">
+          {t('stake_screen_title')} · {ticker}
+        </h1>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-8">
+        {step === 'input' ? (
+          <>
+            <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-4 mb-4">
+              <div className="flex items-start gap-2">
+                <Info size={18} className="text-neon flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-neutral-300 leading-snug">
+                    {t('staking_what_is')}
+                  </p>
+                  <p className="text-xs text-neutral-500 mt-2 font-mono">
+                    ~{pct}% / {t('duration')?.toLowerCase() || 'month'} · {t('staking_desc', { pct: String(pct) })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-neutral-500 mb-1.5">
+              {t('available')}: <span className="font-mono text-neutral-300">{maxAmount.toFixed(8)} {ticker}</span>
+            </p>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder={t('stake_quantity_placeholder')}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="flex-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-neutral-800 text-white font-mono text-base focus:outline-none focus:border-neon/50"
+              />
+              <button
+                type="button"
+                onClick={() => { Haptic.tap(); setAmount(maxAmount > 0 ? String(maxAmount) : ''); }}
+                className="px-4 py-3 rounded-xl border border-neon/50 text-neon font-mono font-semibold text-sm active:scale-95"
+              >
+                Max
+              </button>
+            </div>
+            <p className="text-[11px] text-neutral-500 mb-6">
+              {t('staking_desc', { pct: String(pct) })}
+            </p>
+
+            <button
+              type="button"
+              disabled={!isValid || loading}
+              onClick={handleConfirm}
+              className="w-full py-3.5 rounded-xl bg-neon text-black font-bold text-sm uppercase tracking-wide active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(163,230,53,0.25)]"
+            >
+              {t('stake_confirm_step')}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="rounded-xl border border-neon/30 bg-neon/5 p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp size={20} className="text-neon" />
+                <span className="text-sm font-mono text-white font-semibold">{t('stake_confirm_step')}</span>
+              </div>
+              <p className="text-sm text-neutral-300 leading-snug">
+                {t('stake_confirm_summary', { amount: numAmount.toFixed(8), ticker, pct: String(pct) })}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { Haptic.tap(); setStep('input'); }}
+                className="flex-1 py-3.5 rounded-xl border border-white/20 text-neutral-300 font-medium text-sm active:scale-[0.98]"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleCreateStaking}
+                className="flex-1 py-3.5 rounded-xl bg-neon text-black font-bold text-sm active:scale-[0.98] disabled:opacity-50 shadow-[0_0_20px_rgba(163,230,53,0.25)]"
+              >
+                {loading ? '...' : t('create_staking_btn')}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default StakingCreateScreen;

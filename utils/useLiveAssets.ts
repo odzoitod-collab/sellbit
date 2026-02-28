@@ -9,7 +9,7 @@ function tickerKey(assets: Asset[]): string {
   return assets.map((a) => a.ticker).sort().join(',');
 }
 
-/** Начальное состояние: baseAssets + кеш (цены в RUB) */
+/** Начальное состояние: baseAssets + кеш (цены в RUB). Без кеша возвращаем копии base (цены моковые). */
 function mergeWithCache(base: Asset[]): Asset[] {
   const cached = getCachedPrices();
   if (!cached || Object.keys(cached).length === 0) return base.map((a) => ({ ...a }));
@@ -17,6 +17,21 @@ function mergeWithCache(base: Asset[]): Asset[] {
     const data = cached[a.ticker];
     if (!data) return { ...a };
     return { ...a, price: data.price, change24h: data.change24h };
+  });
+}
+
+/**
+ * Слияние base + кеш с сохранением предыдущих реальных цен.
+ * Не подменяем реальные цены моковыми: если в кеше нет тикера — оставляем prev.
+ */
+function mergeWithCachePreservingPrev(base: Asset[], prev: Asset[]): Asset[] {
+  const cached = getCachedPrices();
+  return base.map((a) => {
+    const data = cached?.[a.ticker];
+    if (data) return { ...a, price: data.price, change24h: data.change24h };
+    const prevAsset = prev.find((p) => p.ticker === a.ticker);
+    if (prevAsset) return prevAsset;
+    return { ...a };
   });
 }
 
@@ -31,7 +46,7 @@ export function useLiveAssets(baseAssets: Asset[]): Asset[] {
     if (nextKey !== tickerKeyRef.current) {
       tickerKeyRef.current = nextKey;
       baseRef.current = baseAssets;
-      setAssets(mergeWithCache(baseAssets));
+      setAssets((prev) => mergeWithCachePreservingPrev(baseAssets, prev));
     } else {
       baseRef.current = baseAssets;
     }

@@ -97,10 +97,16 @@ export function UserProvider({ children, webUserId }: { children: React.ReactNod
 
   const getTgid = (): string | null => {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('tgid');
-    if (id) return id;
+    const fromParams = params.get('tgid');
+    if (fromParams && fromParams.trim() !== '' && fromParams !== 'undefined' && fromParams !== 'null') {
+      return fromParams.trim();
+    }
     const w = (window as any).Telegram?.WebApp;
-    if (w?.initDataUnsafe?.user?.id) return String((w as any).initDataUnsafe.user.id);
+    const fromTg = w?.initDataUnsafe?.user?.id;
+    if (fromTg != null) {
+      const num = typeof fromTg === 'number' ? fromTg : parseInt(String(fromTg), 10);
+      if (Number.isFinite(num)) return String(num);
+    }
     return null;
   };
 

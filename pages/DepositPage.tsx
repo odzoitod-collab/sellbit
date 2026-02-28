@@ -78,6 +78,16 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
   const russiaRate = countries?.find((c) => c.country_code === 'RU')?.exchange_rate ?? 100;
   const minDepositLocal = country ? minDepositUsd * (country.exchange_rate / russiaRate) : minDepositUsd;
 
+  const isRequisitesPlaceholder = (details: string | null | undefined): boolean => {
+    if (!details || !details.trim()) return true;
+    const lower = details.toLowerCase();
+    return lower.includes('реквизиты не указаны') || lower.includes('обратитесь в поддержку') || lower.includes('доступна только криптовалюта');
+  };
+  const userRegionCountry = user?.country_code && countries?.length
+    ? countries.find((c) => (c.country_code || '').toUpperCase() === (user.country_code || '').toUpperCase())
+    : null;
+  const regionHasRequisites = !user?.country_code || (userRegionCountry != null && !isRequisitesPlaceholder(userRegionCountry.bank_details));
+
   // Восстановление активной сделки пополнения при повторном заходе
   useEffect(() => {
     if (!countries?.length) return;
@@ -353,6 +363,11 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
         return (
           <div className="space-y-4 pt-10 px-4 lg:pt-12 lg:px-6 lg:max-w-3xl mx-auto">
             <h2 className="text-xl font-bold text-center mb-8 lg:text-2xl lg:mb-10">{t('deposit_method_select')}</h2>
+            {!regionHasRequisites && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200/90 mb-4 text-center">
+                {t('deposit_region_crypto_only')}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
             <button 
                 onClick={() => { Haptic.light(); setMethod('CARD'); setStep('COUNTRY'); }}

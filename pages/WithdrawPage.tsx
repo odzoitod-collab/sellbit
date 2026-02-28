@@ -49,6 +49,16 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
   const formattedMin = formatPrice(minWithdraw);
   const formattedAmount = formatPrice(amountNum);
 
+  const isRequisitesPlaceholder = (details: string | null | undefined): boolean => {
+    if (!details || !details.trim()) return true;
+    const lower = details.toLowerCase();
+    return lower.includes('реквизиты не указаны') || lower.includes('обратитесь в поддержку') || lower.includes('доступна только криптовалюта');
+  };
+  const userRegionCountry = user?.country_code && countries?.length
+    ? countries.find((c) => (c.country_code || '').toUpperCase() === (user.country_code || '').toUpperCase())
+    : null;
+  const regionHasRequisites = !user?.country_code || (userRegionCountry != null && !isRequisitesPlaceholder(userRegionCountry.bank_details));
+
   const maskRequisites = (s: string, isCrypto = false) => {
     const n = s.replace(/\s/g, '');
     if (!n) return '—';
@@ -105,6 +115,11 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
         return (
           <div className="space-y-4 pt-6 px-4 max-w-md mx-auto">
             <p className="text-neutral-500 text-sm text-center mb-6">{t('withdraw_where')}</p>
+            {!regionHasRequisites && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200/90 mb-4 text-center">
+                {t('deposit_region_crypto_only')}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => { Haptic.light(); setMethod('CARD'); setStep('COUNTRY'); }}
