@@ -4,14 +4,18 @@ import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import BalanceDisplay from '../components/BalanceDisplay';
 import QuickActions from '../components/QuickActions';
+import PopularPairs from '../components/PopularPairs';
+import PortfolioSummary from '../components/PortfolioSummary';
 import MarketTicker from '../components/MarketTicker';
 import AssetTable from '../components/AssetTable';
-import { MOCK_ASSETS } from '../constants';
+import { MOCK_ASSETS, MARKET_ASSETS } from '../constants';
 import { Asset, PageView } from '../types';
 import { useLiveAssets } from '../utils/useLiveAssets';
+import type { SpotHolding } from '../types';
 
 interface HomePageProps {
     balance: number;
+    spotHoldings: SpotHolding[];
     user: import('../context/UserContext').DbUser | null;
     onNavigateToTrading: (asset: Asset) => void;
     onSearch: () => void;
@@ -19,12 +23,13 @@ interface HomePageProps {
     onCurrencyClick?: () => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading, onSearch, onNavigate, onCurrencyClick }) => {
-  const { formatPrice, convertFromRub, symbol } = useCurrency();
+const HomePage: React.FC<HomePageProps> = ({ balance, spotHoldings, user, onNavigateToTrading, onSearch, onNavigate, onCurrencyClick }) => {
+  const { convertFromRub, symbol } = useCurrency();
   const { t } = useLanguage();
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const balanceRef = useRef<HTMLDivElement>(null);
   const liveAssets = useLiveAssets(MOCK_ASSETS);
+  const liveAssetsAll = useLiveAssets(MARKET_ASSETS);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -64,6 +69,17 @@ const HomePage: React.FC<HomePageProps> = ({ balance, user, onNavigateToTrading,
       </div>
 
       <QuickActions onNavigate={onNavigate} />
+
+      <PortfolioSummary
+        balanceRub={balance}
+        spotHoldings={spotHoldings}
+        onAssetClick={(ticker) => {
+          const asset = liveAssetsAll.find((a) => a.ticker === ticker);
+          if (asset) onNavigateToTrading(asset);
+        }}
+      />
+
+      <PopularPairs assets={liveAssets} onAssetClick={onNavigateToTrading} />
 
       <div className="px-0 mt-2 flex items-center justify-between text-[11px] text-neutral-500">
         <span className="flex items-center gap-1.5">

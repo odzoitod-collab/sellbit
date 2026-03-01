@@ -128,6 +128,7 @@ const AppContent: React.FC = () => {
   const [pinCreated, setPinCreated] = useState(false);
   const [authSubPage, setAuthSubPage] = useState<AuthSubPage>(null);
   const [hideNavigation, setHideNavigation] = useState(false);
+  const [hideNavFromExchangePicker, setHideNavFromExchangePicker] = useState(false);
   const [loadingAnimationDone, setLoadingAnimationDone] = useState(false);
 
   const refId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
@@ -505,6 +506,7 @@ const AppContent: React.FC = () => {
         return (
           <HomePage
             balance={balance}
+            spotHoldings={spotHoldings}
             user={user}
             onNavigate={handleNavigate}
             onNavigateToTrading={handleNavigateToTrading}
@@ -562,6 +564,7 @@ const AppContent: React.FC = () => {
           <ExchangePage
             spotHoldings={spotHoldings}
             refreshSpotHoldings={refreshSpotHoldings}
+            onPickerOpenChange={setHideNavFromExchangePicker}
           />
         );
       case 'DEPOSIT':
@@ -590,6 +593,7 @@ const AppContent: React.FC = () => {
         return (
           <HomePage
             balance={balance}
+            spotHoldings={spotHoldings}
             user={user}
             onNavigate={handleNavigate}
             onNavigateToTrading={handleNavigateToTrading}
@@ -603,7 +607,7 @@ const AppContent: React.FC = () => {
   return (
     <CurrencyProvider>
       <LocaleCurrencySync />
-      <Layout currentPage={currentPage} onNavigate={handleNavigate} hideNavigation={hideNavigation}>
+      <Layout currentPage={currentPage} onNavigate={handleNavigate} hideNavigation={hideNavigation || hideNavFromExchangePicker}>
         {renderContent()}
       </Layout>
     </CurrencyProvider>
