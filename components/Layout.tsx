@@ -30,7 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hide
       <main
         className={`flex-1 overflow-y-auto w-full relative z-10 no-scrollbar scroll-smooth overscroll-contain transition-[padding] duration-150
           max-w-md lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto
-          ${hideBottomNav ? 'pb-2' : 'pb-24 lg:pb-8'}
+          ${hideBottomNav ? 'pb-2' : 'pb-32 lg:pb-8'}
         `}
       >
         {children}

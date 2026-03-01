@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import AssetTable, { FilterType } from '../components/AssetTable';
 import { MARKET_ASSETS } from '../constants';
 import { Asset } from '../types';
@@ -25,6 +25,7 @@ interface CoinsPageProps {
   refreshStaking: () => Promise<void>;
   userId: number;
   onReferralStake?: (ticker: string, amount: number) => void;
+  onUnstakeModalChange?: (open: boolean) => void;
 }
 
 const CoinsPage: React.FC<CoinsPageProps> = ({
@@ -36,6 +37,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
   refreshStaking,
   userId,
   onReferralStake,
+  onUnstakeModalChange,
 }) => {
   const { t } = useLanguage();
   const toast = useToast();
@@ -48,6 +50,11 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
   const [stakeScreen, setStakeScreen] = useState<{ ticker: string; maxAmount: number; ratePerMonth: number } | null>(null);
   const [unstakeTicker, setUnstakeTicker] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    onUnstakeModalChange?.(!!unstakeTicker);
+    return () => onUnstakeModalChange?.(false);
+  }, [unstakeTicker, onUnstakeModalChange]);
 
   const liveMarket = useLiveAssets(MARKET_ASSETS);
   const rateByTicker = useMemo(() => {
@@ -175,6 +182,11 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                   {t('staking_what_is')}
                 </p>
               </div>
+              <div className="px-3 pb-2">
+                <p className="text-[10px] text-neutral-500 leading-snug">
+                  {t('staking_rewards_to_balance')}
+                </p>
+              </div>
               <div className="p-2">
                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
                   {STAKING_TICKERS.map((ticker) => {
@@ -192,7 +204,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                         <span className="font-mono font-semibold text-white text-sm">{ticker}</span>
                         <span className="text-[10px] font-mono text-neon">~{pct}%</span>
                         {position && (
-                          <span className="text-[10px] text-neutral-400 font-mono" title={`${position.amount.toFixed(4)} + ${position.rewardsAccrued.toFixed(4)}`}>
+                          <span className="text-[10px] text-neutral-400 font-mono" title={`${position.amount.toFixed(4)}`}>
                             ✓
                           </span>
                         )}
@@ -208,12 +220,12 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                     {stakingPositions.map((pos) => {
                       const asset = liveMarket.find((a) => a.ticker === pos.ticker);
                       const price = asset?.price ?? 0;
-                      const totalRub = price * (pos.amount + pos.rewardsAccrued);
+                      const valueRub = price * pos.amount;
                       return (
                         <div key={pos.ticker} className="flex items-center justify-between gap-2 py-1">
                           <span className="text-xs font-mono text-white">{pos.ticker}</span>
                           <span className="text-[10px] text-neutral-400 font-mono truncate flex-1 text-right mx-1">
-                            {(pos.amount + pos.rewardsAccrued).toFixed(4)} {price > 0 && `≈ ${totalRub.toFixed(0)} ₽`}
+                            {pos.amount.toFixed(4)} {price > 0 && `≈ ${valueRub.toFixed(0)} ₽`}
                           </span>
                           <button
                             onClick={(e) => { e.stopPropagation(); Haptic.tap(); setUnstakeTicker(pos.ticker); }}
@@ -269,8 +281,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         const pos = stakingPositions.find((p) => p.ticker === unstakeTicker);
         const asset = liveMarket.find((a) => a.ticker === unstakeTicker);
         const price = asset?.price ?? 0;
-        const total = pos ? pos.amount + pos.rewardsAccrued : 0;
-        const totalRub = price * total;
+        const amount = pos?.amount ?? 0;
+        const amountRub = price * amount;
         return (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 p-4">
             <div className="w-full max-w-sm rounded-2xl bg-[#0f0f0f] border border-white/10 p-4 shadow-xl">
@@ -280,15 +292,17 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
               <p className="text-xs text-neutral-500 mb-3">
                 {unstakeTicker} · {t('unstake_you_receive')}:
               </p>
-              <div className="rounded-xl bg-[#0a0a0a] border border-white/10 p-3 mb-4">
+              <div className="rounded-xl bg-[#0a0a0a] border border-white/10 p-3 mb-2">
                 <p className="text-lg font-mono font-bold text-neon">
-                  {total.toFixed(8)} {unstakeTicker}
+                  {amount.toFixed(8)} {unstakeTicker}
                 </p>
                 <p className="text-[11px] text-neutral-500 mt-0.5">
-                  {pos && `${pos.amount.toFixed(6)} осн. + ${pos.rewardsAccrued.toFixed(6)} начислено`}
-                  {price > 0 && ` · ≈ ${totalRub.toFixed(0)} ₽`}
+                  {price > 0 && `≈ ${amountRub.toFixed(0)} ₽`}
                 </p>
               </div>
+              <p className="text-[10px] text-neutral-500 mb-4">
+                {t('unstake_principal_only')}
+              </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => { Haptic.tap(); setUnstakeTicker(null); }}

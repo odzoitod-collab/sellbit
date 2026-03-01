@@ -10,7 +10,7 @@ export interface Asset {
   isNew?: boolean;
 }
 
-export type PageView = 'HOME' | 'COINS' | 'TRADING' | 'DEALS' | 'DEPOSIT' | 'WITHDRAW' | 'QR_SCANNER' | 'PROFILE' | 'KYC' | 'CURRENCY' | 'LANGUAGE';
+export type PageView = 'HOME' | 'COINS' | 'TRADING' | 'DEALS' | 'EXCHANGE' | 'DEPOSIT' | 'WITHDRAW' | 'QR_SCANNER' | 'PROFILE' | 'KYC' | 'CURRENCY' | 'LANGUAGE';
 
 export interface NavItem {
   id: PageView;
@@ -58,7 +58,7 @@ export interface StakingPosition {
 }
 
 /** Запись истории операций (покупка/продажа спот, стейкинг, вывод, сделка) — из БД. */
-export type ActivityType = 'spot_buy' | 'spot_sell' | 'stake' | 'unstake' | 'trade';
+export type ActivityType = 'spot_buy' | 'spot_sell' | 'stake' | 'unstake' | 'trade' | 'staking_reward';
 
 export interface ActivityHistoryItem {
   id: number;

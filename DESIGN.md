@@ -39,6 +39,75 @@
 
 ---
 
+## 1.5 Система интерфейса биржи (навигация, страницы, кнопки, тени, шрифты)
+
+### Подход
+- **Единый слой (Layout)**: все основные экраны рендерятся внутри `Layout`: фон, фоновые блики, сайдбар (десктоп), контентная зона, нижнее меню (мобильные). Навигация скрывается только на страницах KYC, CURRENCY, LANGUAGE и при открытой клавиатуре или модалках (например, вывод из стейкинга).
+- **Контент**: `main` с `max-w-md lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto`, `overflow-y-auto`, нижний отступ `pb-32 lg:pb-8` при видимом меню (чтобы контент не уходил под навигацию).
+- **Фон**: `bg-background` (Tailwind: `#050505`), поверх — два декоративных блика с `bg-neon/5`, `bg-neon/3`, `blur-[120px]` / `blur-[100px]` (z-0, pointer-events-none).
+
+### Навигация
+
+**Нижнее меню (мобильные/планшеты, `lg:hidden`)**  
+- Стиль «полуостров»: прижато к низу экрана (`bottom-0`), закругление только сверху `rounded-t-2xl`.  
+- Фон: `bg-[#0a0a0a]/98`, границы `border-t border-x border-white/10`, `backdrop-blur-xl`.  
+- Тень: `shadow-[0_-4px_20px_rgba(0,0,0,0.3)]` — лёгкая тень вверх.  
+- Высота зоны кнопок: `h-[50px]`, иконки 20px, подписи `text-[9px] font-medium tracking-wide`, активный пункт — `text-neon`, неактивный — `text-neutral-500` / `text-neutral-600`.  
+- Отступ снизу: `paddingBottom: max(8px, env(safe-area-inset-bottom))`.  
+- Пункты: **HOME**, **COINS**, **TRADING**, **EXCHANGE**, **DEALS** (иконки: Home, Coins, BarChart2, ArrowLeftRight, Briefcase).
+
+**Сайдбар (десктоп, `hidden lg:flex`)**  
+- Ширина `w-56 min-w-[14rem]`, фон `bg-[#050505]/95`, граница `border-r border-white/10`, `backdrop-blur-sm`.  
+- Пункты те же пять; активный: `bg-neon/15 text-neon`, неактивный: `text-neutral-400 hover:text-white hover:bg-white/5`.  
+- Кнопки: `px-4 py-3 rounded-xl`, иконка 22px, подпись `text-sm font-medium`.
+
+### Доступность страниц
+- **В нижнем меню/сайдбаре**: HOME, COINS, TRADING, EXCHANGE, DEALS.  
+- **Без нижнего меню** (полноэкранные или отдельные флоу): KYC, CURRENCY, LANGUAGE; также меню скрывается при открытой клавиатуре и при открытой модалке вывода из стейкинга.  
+- **Остальные страницы** открываются по переходам: DEPOSIT, WITHDRAW, QR_SCANNER, PROFILE — из главной (Quick Actions, хедер); KYC — из профиля; CURRENCY, LANGUAGE — из профиля/настроек. TRADING открывается с выбором актива с COINS или HOME.
+
+### Кнопки
+- **Основное действие (CTA)**: `bg-neon text-black font-bold`, скругление `rounded-xl`, высота обычно `py-3` / `py-3.5`, `active:scale-[0.98]`, при необходимости `shadow-[0_0_20px_rgba(163,230,53,0.2)]`. Отключённое состояние: `disabled:opacity-50 disabled:cursor-not-allowed`.  
+- **Вторичная / обводка**: `border border-white/20` или `border-neon/50`, фон `bg-white/5` или прозрачный, `hover:bg-neon/10`, `hover:border-neon/30`, `text-neutral-300` / `text-neon`.  
+- **Переключатели (табы, направление обмена)**: активный — `bg-neon/20 text-neon border border-neon/40`, неактивный — `text-neutral-500 hover:text-neutral-300`.  
+- **Быстрые действия на главной**: круглые кнопки `h-14 w-14 lg:h-16 lg:w-16 rounded-full`; главная (Пополнить) — `bg-neon text-black shadow-[0_0_15px_rgba(163,230,53,0.3)]`; остальные — `bg-neutral-900 border-white/5`.  
+- **Хаптик**: на клики по навигации и кнопкам вызывается `Haptic.tap()` (или `success`/`error` по результату).
+
+### Карточки и блоки
+- Фон: `bg-[#0a0a0a]`, граница: `border border-white/10` или `border-neutral-800`, скругление `rounded-xl` (реже `rounded-2xl` для крупных блоков).  
+- При наведении/фокусе: `hover:border-neon/50`, иногда `focus:border-neon/50 focus:ring-1 focus:ring-neon/50`.  
+- Липкие шапки (например, поиск на Рынке): `sticky top-0 z-50 bg-[#050505]` и при необходимости `shadow-[0_10px_30px_rgba(0,0,0,0.8)]`.
+
+### Поля ввода
+- Контейнер: `bg-[#0a0a0a]` или `bg-[#050505]`, `border border-neutral-800`, `rounded-xl`, `focus-within:border-neon/50`.  
+- Текст: `text-white font-mono`, размер `text-sm` / `text-base` / `text-lg` в зависимости от экрана, placeholder `placeholder-neutral-600` / `placeholder-neutral-700`.
+
+### Тени и подсветки
+- **Неон-подсветка кнопок**: `shadow-[0_0_10px_rgba(163,230,53,0.3)]`, `shadow-[0_0_20px_rgba(163,230,53,0.2)]`, для подчёркивания таба — `shadow-[0_0_8px_#a3e635]`.  
+- **Фоновые блики**: `bg-neon/5`, `bg-neon/3`, `blur-[120px]`, `blur-[100px]` (в Layout).  
+- **Нижнее меню**: тень вверх `shadow-[0_-4px_20px_rgba(0,0,0,0.3)]`.  
+- **Хедер главной**: `shadow-md shadow-black/50`.  
+- **Чарт/виджет**: тонкая обводка и внутренняя линия `shadow-[0_0_0_1px_rgba(163,230,53,0.06),inset_0_1px_0_rgba(255,255,255,0.03)]`.
+
+### Размеры шрифтов
+- **Заголовки страниц**: `text-xl font-bold text-white`.  
+- **Крупные суммы/тикеры**: `text-lg font-mono font-bold text-neon` или `text-white`.  
+- **Подзаголовки / лейблы**: `text-xs` / `text-[11px]` / `text-[10px]`, часто `uppercase tracking-wide text-neutral-500`.  
+- **Основной текст**: `text-sm`, для чисел — `font-mono`.  
+- **Мелкий текст / подписи**: `text-[10px]` / `text-[9px]`, `text-neutral-500` / `text-neutral-400`.  
+- **Навигация**: подписи `text-[9px]` (низ), `text-sm` (сайдбар).
+
+### Анимации
+- Появление страниц: `animate-fade-in` (opacity + translateY 8px, 0.2s ease-out).  
+- Модалки и оверлеи: те же классы при необходимости, z-index 60–200 в зависимости от слоя (меню 50, модалки 100, пин/онбординг 200).  
+- Кнопки: `active:scale-95` / `active:scale-[0.98]`, `transition-transform` / `transition-all duration-200`.
+
+### Тема Tailwind (index.html)
+- **Цвета**: `background: '#050505'`, `surface: '#0a0a0a'`, `neon: '#a3e635'`, `subtle: '#1f1f1f'`.  
+- **Шрифты**: `sans: ['Inter']`, `mono: ['Roboto Mono']`.
+
+---
+
 ## 2. Логотип SellBit
 
 ### 2.1 Цветовая палитра логотипа

@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage';
 import TradingPage from './pages/TradingPage';
 import CoinsPage from './pages/CoinsPage';
 import DealsPage from './pages/DealsPage';
+import ExchangePage from './pages/ExchangePage';
 import DepositPage from './pages/DepositPage';
 import WithdrawPage from './pages/WithdrawPage';
 import QRScannerPage from './pages/QRScannerPage';
@@ -19,7 +20,7 @@ import { usePin } from './context/PinContext';
 import { supabase } from './lib/supabase';
 import { tradeRowToDeal, dealToTradeInsert } from './lib/trades';
 import { fetchSpotHoldings } from './lib/spot';
-import { fetchStakingPositions, fetchStakingRates } from './lib/staking';
+import { fetchStakingPositions, fetchStakingRates, accrualToBalance } from './lib/staking';
 import { useToast } from './context/ToastContext';
 import { useLanguage } from './context/LanguageContext';
 import CreatePinScreen from './components/CreatePinScreen';
@@ -173,6 +174,12 @@ const AppContent: React.FC = () => {
 
   const refreshStaking = React.useCallback(async () => {
     if (!user) return;
+    const stakingTickers = ['BTC', 'ETH', 'SOL'];
+    const pricesRub: Record<string, number> = {};
+    liveAssetsForTrading.forEach((a) => {
+      if (stakingTickers.includes(a.ticker) && a.price > 0) pricesRub[a.ticker] = a.price;
+    });
+    if (Object.keys(pricesRub).length > 0) await accrualToBalance(user.user_id, pricesRub);
     const [positions, rates] = await Promise.all([
       fetchStakingPositions(user.user_id),
       fetchStakingRates(),
@@ -180,7 +187,7 @@ const AppContent: React.FC = () => {
     setStakingPositions(positions);
     setStakingRates(rates);
     refreshSpotHoldings();
-  }, [user, refreshSpotHoldings]);
+  }, [user, liveAssetsForTrading, refreshSpotHoldings]);
 
   const notifyReferralSpotBuy = React.useCallback((ticker: string, amountRub: number) => {
     const base =
@@ -516,6 +523,7 @@ const AppContent: React.FC = () => {
             refreshStaking={refreshStaking}
             userId={user?.user_id ?? 0}
             onReferralStake={notifyReferralStake}
+            onUnstakeModalChange={setHideNavigation}
           />
         );
       case 'TRADING': {
@@ -547,6 +555,13 @@ const AppContent: React.FC = () => {
             stakingPositions={stakingPositions}
             userId={user?.user_id ?? 0}
             onNavigateToTrading={handleNavigateToTrading}
+          />
+        );
+      case 'EXCHANGE':
+        return (
+          <ExchangePage
+            spotHoldings={spotHoldings}
+            refreshSpotHoldings={refreshSpotHoldings}
           />
         );
       case 'DEPOSIT':

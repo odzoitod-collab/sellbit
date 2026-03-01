@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Coins, BarChart2, Briefcase } from 'lucide-react';
+import { Home, Coins, BarChart2, Briefcase, ArrowLeftRight } from 'lucide-react';
 import { PageView, NavItem } from '../types';
 import { Haptic } from '../utils/haptics';
 import { useLanguage } from '../context/LanguageContext';
@@ -15,6 +15,7 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
     { id: 'HOME', label: t('nav_home'), icon: Home },
     { id: 'COINS', label: t('nav_coins'), icon: Coins },
     { id: 'TRADING', label: t('nav_trading'), icon: BarChart2 },
+    { id: 'EXCHANGE', label: t('nav_exchange'), icon: ArrowLeftRight },
     { id: 'DEALS', label: t('nav_deals'), icon: Briefcase },
   ];
   return (

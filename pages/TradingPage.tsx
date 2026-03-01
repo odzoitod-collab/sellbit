@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Asset, Deal } from '../types';
-import { ArrowLeft, Clock, Zap, Check, X, ChevronDown, Info, TrendingUp, BarChart3, FileText } from 'lucide-react';
+import { ArrowLeft, Clock, Zap, Check, X, ChevronDown, Info, BarChart3, FileText } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import { useToast } from '../context/ToastContext';
 import { useUser } from '../context/UserContext';
@@ -330,7 +330,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                 title={t('chart')}
                 className="absolute inset-0 w-full h-full rounded-xl border-0"
                 src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}&interval=5&hidesidetoolbar=1&hidetoptoolbar=1&symboledit=0&saveimage=0&toolbarbg=0a0a0a&studies=[]&hide_legend=1&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=ru&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=${encodeURIComponent(getTradingViewSymbol(asset.ticker))}`}
-                allowTransparency
+                allowtransparency="true"
                 scrolling="no"
                 frameBorder={0}
               />
@@ -657,30 +657,6 @@ const TradingPage: React.FC<TradingPageProps> = ({
                           <span className="flex items-center gap-0.5"><Info size={9} /> {t('min')}: {formatPrice(MIN_DEAL_RUB)} {symbol}</span>
                         </div>
                     </div>
-
-                    {/* Пример потенциальной прибыли при движении цены */}
-                    {(() => {
-                      const numAmount = parseInt(amount) || 0;
-                      // Показываем пример для среднего движения в 3%
-                      const avgMove = 0.03; 
-                      const potentialProfit = Math.round(numAmount * avgMove * leverage);
-                      
-                      return (
-                        <>
-                          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 flex items-center justify-between gap-2">
-                            <span className="text-[10px] text-neutral-500 uppercase font-bold flex items-center gap-1">
-                              <TrendingUp size={10} className="text-neon/80" /> {t('at_3_move')}
-                            </span>
-                            <span className="text-xs font-mono font-bold text-neon">
-                              ≈ ±{formatPrice(potentialProfit)} {symbol}
-                            </span>
-                          </div>
-                          <p className="text-[9px] text-neutral-500 px-0.5 mt-0.5 leading-tight">
-                            {t('result_note')}
-                          </p>
-                        </>
-                      );
-                    })()}
 
                     {/* Leverage */}
                     <div className="space-y-0.5">

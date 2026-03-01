@@ -21,7 +21,7 @@ interface DealsPageProps {
 const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPositions = [], userId, onNavigateToTrading }) => {
     const { formatPrice, symbol } = useCurrency();
     const { t } = useLanguage();
-    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY' | 'ASSETS' | 'STAKING'>('ACTIVE');
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY' | 'ASSETS' | 'STAKING'>('HISTORY');
     const [now, setNow] = useState(Date.now());
     const [activityHistory, setActivityHistory] = useState<ActivityHistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -180,9 +180,10 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                         stake: t('stake_btn'),
                         unstake: t('unstake_btn'),
                         trade: t('history_trade'),
+                        staking_reward: t('staking_reward_history'),
                     };
                     const label = labelMap[item.activity_type];
-                    const isGreen = item.activity_type === 'spot_buy' || item.activity_type === 'stake' || (item.activity_type === 'trade' && (item.amount_rub ?? 0) >= 0);
+                    const isGreen = item.activity_type === 'spot_buy' || item.activity_type === 'stake' || item.activity_type === 'staking_reward' || (item.activity_type === 'trade' && (item.amount_rub ?? 0) >= 0);
                     const isRed = item.activity_type === 'spot_sell' || item.activity_type === 'unstake' || (item.activity_type === 'trade' && (item.amount_rub ?? 0) < 0);
                     const ticker = item.ticker || (item.payload?.symbol as string) || '—';
                     const amountRub = item.amount_rub ?? 0;
@@ -208,6 +209,9 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                                 {item.activity_type === 'unstake' && quantity > 0 && (
                                     <span className="text-[10px] text-neutral-500 font-mono">{quantity.toFixed(6)}</span>
                                 )}
+                                {item.activity_type === 'staking_reward' && quantity > 0 && (
+                                    <span className="text-[10px] text-neutral-500 font-mono">{quantity.toFixed(6)}</span>
+                                )}
                                 <span className="text-[10px] text-neutral-500 mt-1">{formatHistoryDate(item.created_at)}</span>
                             </div>
                             <div className="text-right">
@@ -223,6 +227,9 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                                     <span className="font-mono text-sm text-neon">−{formatPrice(amountRub)} {symbol}</span>
                                 )}
                                 {item.activity_type === 'unstake' && (
+                                    <span className="font-mono text-sm text-green-500">+{formatPrice(amountRub)} {symbol}</span>
+                                )}
+                                {item.activity_type === 'staking_reward' && (
                                     <span className="font-mono text-sm text-green-500">+{formatPrice(amountRub)} {symbol}</span>
                                 )}
                             </div>
@@ -251,37 +258,25 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                                 <TrendingUp size={18} className="text-neon" />
                                 <span className="text-xs text-neutral-500 uppercase font-medium">{t('staking_income')}</span>
                             </div>
-                            <p className="text-2xl font-mono font-bold text-neon">
-                                {formatPrice(
-                                    stakingPositions.reduce((sum, pos) => {
-                                        const asset = liveAssets.find((a) => a.ticker === pos.ticker);
-                                        return sum + pos.rewardsAccrued * (asset?.price ?? 0);
-                                    }, 0)
-                                )} {symbol}
-                            </p>
-                            <p className="text-[11px] text-neutral-500 mt-1">
-                                {t('total_staking_rewards')}
+                            <p className="text-[11px] text-neutral-500">
+                                {t('staking_rewards_to_balance')}
                             </p>
                         </div>
                         {stakingPositions.map((pos) => {
                             const asset = liveAssets.find((a) => a.ticker === pos.ticker) || MARKET_ASSETS.find((a) => a.ticker === pos.ticker);
                             const price = asset?.price ?? 0;
-                            const valueRub = (pos.amount + pos.rewardsAccrued) * price;
-                            const rewardsRub = pos.rewardsAccrued * price;
+                            const valueRub = pos.amount * price;
                             return (
                                 <div key={pos.ticker} className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4">
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <span className="font-bold text-white text-lg">{pos.ticker}</span>
                                             <p className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                                                {pos.amount.toFixed(6)} {pos.ticker} + {pos.rewardsAccrued.toFixed(6)} {t('staking_income').toLowerCase()}
+                                                {pos.amount.toFixed(6)} {pos.ticker}
                                             </p>
                                             {price > 0 && (
                                                 <p className="text-xs text-neutral-400 mt-1">
-                                                ≈ {formatPrice(valueRub)} {symbol}
-                                                {rewardsRub > 0 && (
-                                                    <span className="text-neon ml-1">(+{formatPrice(rewardsRub)} {t('staking_income').toLowerCase()})</span>
-                                                )}
+                                                    ≈ {formatPrice(valueRub)} {symbol}
                                                 </p>
                                             )}
                                         </div>

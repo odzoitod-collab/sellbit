@@ -52,6 +52,21 @@ export async function fetchStakingPositions(userId: number): Promise<StakingPosi
   return data.map(normalizePosition);
 }
 
+/** Начислить накопленные часы стейкинга на баланс в валюте юзера (RUB). Вызывать перед загрузкой позиций при наличии цен. */
+export async function accrualToBalance(
+  userId: number,
+  pricesRub: Record<string, number>
+): Promise<void> {
+  const payload = Object.fromEntries(
+    Object.entries(pricesRub).filter(([, v]) => v != null && Number.isFinite(v) && v > 0)
+  );
+  if (Object.keys(payload).length === 0) return;
+  await supabase.rpc('staking_accrual_to_balance', {
+    p_user_id: userId,
+    p_prices_rub: payload,
+  });
+}
+
 export interface StakeResult {
   ok: boolean;
   error?: string;

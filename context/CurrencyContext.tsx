@@ -25,6 +25,8 @@ interface CurrencyContextValue {
   loading: boolean;
   /** Конвертировать цену из RUB в выбранную валюту */
   convertFromRub: (priceRub: number) => number;
+  /** Конвертировать сумму из выбранной валюты в RUB */
+  convertToRub: (amountInDisplayCurrency: number) => number;
   /** Символ выбранной валюты (₽, $, € и т.д.) */
   symbol: string;
   /** Код валюты для пар (RUB, USD, EUR) */
@@ -87,6 +89,16 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     [baseCurrency, rates]
   );
 
+  const convertToRub = useCallback(
+    (amountInDisplayCurrency: number): number => {
+      if (baseCurrency === 'rub') return amountInDisplayCurrency;
+      const oneRubInDisplay = convertFromRub(1);
+      if (oneRubInDisplay === 0) return amountInDisplayCurrency;
+      return amountInDisplayCurrency / oneRubInDisplay;
+    },
+    [baseCurrency, convertFromRub]
+  );
+
   const formatPrice = useCallback(
     (priceRub: number, options?: { fractionDigits?: number }): string => {
       const value = convertFromRub(priceRub);
@@ -118,6 +130,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     rates,
     loading,
     convertFromRub,
+    convertToRub,
     symbol,
     currencyCode,
     currencyName,
