@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getSupabaseErrorMessage } from './supabaseError';
 import type { SpotHolding } from '../types';
 
 export async function fetchSpotHoldings(userId: number): Promise<SpotHolding[]> {
@@ -42,7 +43,7 @@ export async function spotBuy(
     p_amount_rub: amountRub,
     p_price_rub: priceRub,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: getSupabaseErrorMessage(error, 'Ошибка операции') };
   const res = data as { ok?: boolean; error?: string; quantity?: number; avg_price_rub?: number };
   return { ok: res?.ok === true, error: res?.error, quantity: res?.quantity, avg_price_rub: res?.avg_price_rub };
 }
@@ -65,7 +66,7 @@ export async function spotSell(
     p_quantity: quantity,
     p_price_rub: priceRub,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: getSupabaseErrorMessage(error, 'Ошибка операции') };
   const res = data as { ok?: boolean; error?: string; amount_rub?: number };
   return { ok: res?.ok === true, error: res?.error, amount_rub: res?.amount_rub };
 }

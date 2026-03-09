@@ -66,8 +66,8 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col">
-      <header className="flex items-center px-4 py-3 border-b border-white/[0.06] bg-[#050505]">
+    <div className="min-h-screen bg-background text-white flex flex-col">
+      <header className="flex items-center px-4 py-3 border-b border-white/[0.06] bg-background">
         <button onClick={() => {
           if (step === 'email') {
             onBack();
@@ -98,7 +98,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
                   placeholder="example@mail.com"
                   autoComplete="email"
                   autoFocus
-                  className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
+                  className="w-full py-3 px-4 bg-card border border-border rounded-xl text-white placeholder-textSecondary focus:border-neon focus:outline-none"
                 />
               </div>
               <button type="submit" className="w-full py-3.5 px-4 bg-neon text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-neon/90 active:scale-[0.99] transition-all">
@@ -118,7 +118,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
                   placeholder="Не менее 6 символов"
                   autoComplete="new-password"
                   autoFocus
-                  className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
+                  className="w-full py-3 px-4 bg-card border border-border rounded-xl text-white placeholder-textSecondary focus:border-neon focus:outline-none"
                 />
               </div>
               <div>
@@ -129,7 +129,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Введите пароль еще раз"
                   autoComplete="new-password"
-                  className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
+                  className="w-full py-3 px-4 bg-card border border-border rounded-xl text-white placeholder-textSecondary focus:border-neon focus:outline-none"
                 />
               </div>
               <button type="submit" className="w-full py-3.5 px-4 bg-neon text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-neon/90 active:scale-[0.99] transition-all">
@@ -149,7 +149,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ refId, onBack, onSuccess })
                   placeholder="Как к вам обращаться"
                   autoComplete="name"
                   autoFocus
-                  className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
+                  className="w-full py-3 px-4 bg-card border border-border rounded-xl text-white placeholder-textSecondary focus:border-neon focus:outline-none"
                 />
               </div>
               <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-neon text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-neon/90 disabled:opacity-60 active:scale-[0.99] transition-all">

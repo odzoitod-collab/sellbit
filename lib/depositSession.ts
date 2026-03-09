@@ -3,10 +3,10 @@
  * Сохраняется в localStorage; при повторном заходе в «Пополнить» пользователь попадает на сделку с реквизитами до истечения таймера.
  */
 
-const STORAGE_KEY = 'sellbit_active_deposit';
+const STORAGE_KEY = 'etoro_active_deposit';
 const TIMER_SECONDS = 600; // 10 минут
 
-export type DepositMethod = 'CARD' | 'SBP' | 'CRYPTO' | 'CRYPTO_BOT';
+export type DepositMethod = 'CARD' | 'CRYPTO';
 export type CryptoNetwork = 'trc20' | 'ton' | 'btc' | 'sol';
 
 export interface DepositSessionData {

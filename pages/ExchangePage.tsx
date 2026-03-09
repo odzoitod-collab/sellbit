@@ -147,12 +147,12 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ spotHoldings, refreshSpotHo
     <div className="flex flex-col h-full animate-fade-in px-4 pt-2 pb-6">
       <h1 className="text-base font-semibold text-white mb-3">{t('exchange_title')}</h1>
 
-      <div className="rounded-lg border border-white/5 bg-[#0a0a0a] p-3 mb-2">
+      <div className="rounded-lg border border-white/5 bg-surface p-3 mb-2">
         <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">{t('from_label')}</p>
         <button
           type="button"
           onClick={() => { Haptic.tap(); openPicker('from'); }}
-          className="w-full flex items-center justify-between gap-2 py-2 px-2.5 rounded-lg bg-[#050505] border border-white/5 hover:border-white/10 transition-colors text-left"
+          className="w-full flex items-center justify-between gap-2 py-2 px-2.5 rounded-lg bg-background border border-white/5 hover:border-white/10 transition-colors text-left"
         >
           <div className="min-w-0 flex-1">
             <p className="font-mono font-semibold text-sm text-white truncate">{fromLabel}</p>
@@ -166,7 +166,7 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ spotHoldings, refreshSpotHo
           placeholder={isFromCurrency ? `0 ${symbol}` : '0'}
           value={amount}
           onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
-          className="mt-2 w-full bg-[#050505] border border-white/5 rounded-lg px-3 py-2.5 text-white font-mono text-base focus:outline-none focus:border-neon/30"
+          className="mt-2 w-full bg-background border border-white/5 rounded-lg px-3 py-2.5 text-white font-mono text-base focus:outline-none focus:border-neon/30"
         />
         <p className="mt-1 text-[10px] font-mono text-neutral-500">
           {t('exchange_min_amount', { amount: `${formatPrice(MIN_EXCHANGE_RUB)} ${symbol}` })}
@@ -182,17 +182,17 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ spotHoldings, refreshSpotHo
         )}
       </div>
 
-      <div className="rounded-lg border border-white/5 bg-[#0a0a0a] p-3 mb-4">
+      <div className="rounded-lg border border-white/5 bg-surface p-3 mb-4">
         <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">{t('to_label')}</p>
         <button
           type="button"
           onClick={() => { Haptic.tap(); openPicker('to'); }}
-          className="w-full flex items-center justify-between gap-2 py-2 px-2.5 rounded-lg bg-[#050505] border border-white/5 hover:border-white/10 transition-colors text-left"
+          className="w-full flex items-center justify-between gap-2 py-2 px-2.5 rounded-lg bg-background border border-white/5 hover:border-white/10 transition-colors text-left"
         >
           <div className="min-w-0 flex-1">
             <p className="font-mono font-semibold text-sm text-white truncate">{toLabel}</p>
             {!isToCurrency && assetTo && (
-              <p className="text-[10px] font-mono text-neutral-500 truncate">{formatPrice(assetTo.price)} {symbol}</p>
+              <p className="text-[10px] font-mono text-neutral-500 truncate">{assetTo.priceUnavailable ? '—' : formatPrice(assetTo.price)} {symbol}</p>
             )}
           </div>
           <ChevronDown size={16} className="text-neutral-500 flex-shrink-0" />

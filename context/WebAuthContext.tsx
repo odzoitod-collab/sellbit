@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { getSupabaseErrorMessage } from '../lib/supabaseError';
+import { logAction } from '../lib/appLog';
 
-const STORAGE_KEY = 'sellbit_web_user_id';
+const STORAGE_KEY = 'etoro_web_user_id';
 
 interface WebAuthContextValue {
   webUserId: number | null;
@@ -23,14 +25,18 @@ export function WebAuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.rpc('login_web_user', { p_email: email, p_password: password });
-    if (error || !data) return { ok: false, error: 'Неверный email или пароль' };
+    if (error || !data) {
+      const msg = error ? getSupabaseErrorMessage(error, 'Неверный email или пароль') : 'Неверный email или пароль';
+      return { ok: false, error: msg };
+    }
     const u = data as { user_id?: number };
     if (u?.user_id) {
       setWebUserId(u.user_id);
       localStorage.setItem(STORAGE_KEY, String(u.user_id));
+      logAction('login', { userId: u.user_id, payload: { email: email.trim().toLowerCase() } }).catch(() => {});
       return { ok: true };
     }
-    return { ok: false, error: 'Неверный email или пароль' };
+    return { ok: false, error: getSupabaseErrorMessage(null, 'Неверный email или пароль') };
   }, []);
 
   const register = useCallback(async (email: string, password: string, fullName: string, referrerId: number) => {
@@ -40,12 +46,13 @@ export function WebAuthProvider({ children }: { children: React.ReactNode }) {
       p_full_name: fullName,
       p_referrer_id: referrerId,
     });
-    if (error) return { ok: false, error: error.message || 'Ошибка регистрации' };
+    if (error) return { ok: false, error: getSupabaseErrorMessage(error, 'Ошибка регистрации') };
     const d = data as { error?: string; user_id?: number };
     if (d?.error === 'EMAIL_EXISTS') return { ok: false, error: 'Этот email уже зарегистрирован' };
     if (d?.user_id) {
       setWebUserId(d.user_id);
       localStorage.setItem(STORAGE_KEY, String(d.user_id));
+      logAction('register', { userId: d.user_id, payload: { email: email.trim().toLowerCase(), referrerId } }).catch(() => {});
       return { ok: true };
     }
     return { ok: false, error: 'Ошибка регистрации' };

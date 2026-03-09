@@ -1,5 +1,7 @@
 import React from 'react';
 
+export type AssetCategory = 'crypto' | 'stock' | 'commodity';
+
 export interface Asset {
   id: string;
   ticker: string;
@@ -8,6 +10,13 @@ export interface Asset {
   volume24h: number; // In RUB
   change24h: number; // Percentage
   isNew?: boolean;
+  /**
+   * Тип актива: криптовалюта, акция или сырьевой инструмент.
+   * Если не указан, по умолчанию считаем crypto.
+   */
+  category?: AssetCategory;
+  /** true, если цену не удалось получить (например, CORS для Yahoo Finance) — в UI показывать "—". */
+  priceUnavailable?: boolean;
 }
 
 export type PageView = 'HOME' | 'COINS' | 'TRADING' | 'DEALS' | 'EXCHANGE' | 'DEPOSIT' | 'WITHDRAW' | 'QR_SCANNER' | 'PROFILE' | 'KYC' | 'CURRENCY' | 'LANGUAGE';

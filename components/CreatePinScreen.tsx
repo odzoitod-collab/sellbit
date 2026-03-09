@@ -28,15 +28,15 @@ const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, webUserId, onCr
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#050505] flex flex-col items-center justify-center px-6 animate-fade-in overflow-y-auto py-8">
-      <div className="flex flex-col items-center w-full max-w-[360px]">
-        <div className="w-20 h-20 rounded-full border-2 border-neon/40 bg-neon/10 flex items-center justify-center mb-8">
+    <div className="fullscreen-overlay z-[200] bg-background flex flex-col items-center justify-center overflow-y-auto py-8 animate-fade-in">
+      <div className="flex flex-col items-center w-full max-w-[360px] px-4">
+        <div className="w-20 h-20 rounded-full border-2 border-neon/40 bg-neon/10 flex items-center justify-center mb-8 flex-shrink-0">
           <Check size={40} className="text-neon" strokeWidth={2.5} />
         </div>
-        <h1 className="text-2xl font-bold text-white text-center mb-2">
+        <h1 className="text-2xl font-bold text-white text-center mb-2 tracking-tight">
           {t('create_pin_first')}
         </h1>
-        <p className="text-sm text-neutral-500 text-center mb-8 max-w-xs">
+        <p className="text-sm text-textMuted text-center mb-8 max-w-xs leading-relaxed">
           {t('create_pin_hint_first')}
         </p>
 
@@ -48,7 +48,7 @@ const CreatePinScreen: React.FC<CreatePinScreenProps> = ({ tgid, webUserId, onCr
         />
 
         {error && (
-          <p className="mt-6 text-sm text-red-500 text-center">{error}</p>
+          <p className="mt-6 text-sm text-red-400 text-center font-medium">{error}</p>
         )}
       </div>
     </div>

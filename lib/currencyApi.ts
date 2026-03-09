@@ -3,7 +3,7 @@
  * Кеш в localStorage для быстрой конвертации при перезагрузке.
  */
 
-const RATES_CACHE_KEY = 'neonflow_usd_rates';
+const RATES_CACHE_KEY = 'etoro_usd_rates';
 const RATES_CACHE_TTL_MS = 2 * 60 * 1000; // 2 минуты
 
 function getCachedRates(): UsdRates | null {

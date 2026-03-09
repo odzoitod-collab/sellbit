@@ -19,7 +19,7 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
     { id: 'DEALS', label: t('nav_deals'), icon: Briefcase },
   ];
   return (
-    <aside className="hidden lg:flex flex-col w-56 min-w-[14rem] border-r border-white/10 bg-[#050505]/95 backdrop-blur-sm shrink-0">
+    <aside className="hidden lg:flex flex-col w-56 min-w-[14rem] border-r border-border bg-card shrink-0">
       <nav className="sticky top-0 py-6 px-4 flex flex-col gap-1">
         {navItems.map((item) => {
           const isActive = currentPage === item.id;
@@ -29,7 +29,7 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
               key={item.id}
               onClick={() => { Haptic.tap(); onNavigate(item.id); }}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                isActive ? 'bg-neon/15 text-neon' : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                isActive ? 'bg-neon/20 text-neon border border-neon' : 'text-textMuted hover:text-white hover:bg-surface border border-transparent'
               }`}
             >
               <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />

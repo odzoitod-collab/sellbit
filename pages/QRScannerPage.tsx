@@ -91,7 +91,7 @@ const QRScannerPage: React.FC<QRScannerPageProps> = ({ onBack, onScan }) => {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-[#050505] animate-fade-in">
+    <div className="flex flex-col h-full bg-background animate-fade-in">
       <header className="flex items-center px-4 py-4 border-b border-white/5">
         <button onClick={() => { Haptic.tap(); stopScanning(); onBack(); }} className="text-neutral-400 hover:text-white mr-4">
           <ArrowLeft size={24} />
@@ -105,7 +105,7 @@ const QRScannerPage: React.FC<QRScannerPageProps> = ({ onBack, onScan }) => {
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         {status === 'idle' && (
           <div className="text-center">
-            <div className="w-24 h-24 rounded-2xl bg-neon/20 flex items-center justify-center mx-auto mb-6">
+            <div className="w-24 h-24 rounded-2xl bg-card border border-neon flex items-center justify-center mx-auto mb-6">
               <Scan size={48} className="text-neon" />
             </div>
             <p className="text-neutral-400 text-sm mb-6 max-w-xs">
@@ -125,7 +125,7 @@ const QRScannerPage: React.FC<QRScannerPageProps> = ({ onBack, onScan }) => {
             <div id={containerId} className="rounded-2xl overflow-hidden bg-black" style={{ minHeight: 300 }} />
             <button
               onClick={() => { Haptic.tap(); stopScanning(); }}
-              className="mt-4 w-full py-3 bg-white/10 text-white font-semibold rounded-xl flex items-center justify-center gap-2"
+              className="mt-4 w-full py-3 bg-card border border-border text-white font-semibold rounded-xl flex items-center justify-center gap-2"
             >
               <X size={20} />
               Остановить
@@ -135,7 +135,7 @@ const QRScannerPage: React.FC<QRScannerPageProps> = ({ onBack, onScan }) => {
 
         {status === 'success' && (
           <div className="text-center w-full max-w-sm">
-            <div className="w-16 h-16 rounded-full bg-neon/20 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-full bg-card border border-neon flex items-center justify-center mx-auto mb-4">
               <Scan size={32} className="text-neon" />
             </div>
             <p className="text-neon font-semibold mb-2">QR-код распознан</p>
@@ -145,7 +145,7 @@ const QRScannerPage: React.FC<QRScannerPageProps> = ({ onBack, onScan }) => {
             <div className="flex gap-2">
               <button
                 onClick={() => { Haptic.tap(); setStatus('idle'); setLastResult(null); }}
-                className="flex-1 py-3 bg-white/10 text-white font-semibold rounded-xl"
+                className="flex-1 py-3 bg-card border border-border text-white font-semibold rounded-xl"
               >
                 Ещё раз
               </button>

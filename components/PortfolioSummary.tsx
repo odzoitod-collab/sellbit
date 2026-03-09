@@ -52,7 +52,7 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
   if (totalRub <= 0 && spotHoldings.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-white/5 bg-[#0a0a0a] p-3 mb-3">
+    <div className="rounded-lg border border-white/5 bg-surface p-3 mb-3">
       <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-2">
         {t('portfolio_summary')}
       </p>

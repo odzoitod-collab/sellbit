@@ -64,8 +64,8 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#050505] animate-fade-in overflow-hidden">
-      <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-[#050505]">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-background animate-fade-in overflow-hidden">
+      <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-background">
         <button
           type="button"
           onClick={() => { Haptic.tap(); step === 'confirm' ? setStep('input') : onClose(); }}
@@ -82,7 +82,7 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-8">
         {step === 'input' ? (
           <>
-            <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-4 mb-4">
+            <div className="rounded-xl border border-white/10 bg-surface p-4 mb-4">
               <div className="flex items-start gap-2">
                 <Info size={18} className="text-neon flex-shrink-0 mt-0.5" />
                 <div>
@@ -106,7 +106,7 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
                 placeholder={t('stake_quantity_placeholder')}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="flex-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-neutral-800 text-white font-mono text-base focus:outline-none focus:border-neon/50"
+                className="flex-1 px-4 py-3 rounded-xl bg-surface border border-neutral-800 text-white font-mono text-base focus:outline-none focus:border-neon/50"
               />
               <button
                 type="button"

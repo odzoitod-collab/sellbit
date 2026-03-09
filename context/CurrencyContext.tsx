@@ -42,7 +42,7 @@ const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const [baseCurrency, setBaseCurrencyState] = useState<string>(() => {
     try {
-      const stored = localStorage.getItem('neonflow_currency');
+      const stored = localStorage.getItem('etoro_currency');
       return stored || 'usd';
     } catch {
       return 'usd';
@@ -71,7 +71,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const normalized = code.toLowerCase();
     setBaseCurrencyState(normalized);
     try {
-      localStorage.setItem('neonflow_currency', normalized);
+      localStorage.setItem('etoro_currency', normalized);
     } catch {}
   }, []);
 

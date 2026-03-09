@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { getSupabaseErrorMessage } from '../lib/supabaseError';
 
 export interface DbUser {
   user_id: number;
@@ -119,8 +120,10 @@ export function UserProvider({ children, webUserId }: { children: React.ReactNod
       .single();
     if (e) {
       setUser(null);
+      setError(getSupabaseErrorMessage(e, 'Не удалось загрузить профиль'));
       return;
     }
+    setError(null);
     setUser(data as DbUser);
   }, []);
 
@@ -132,8 +135,10 @@ export function UserProvider({ children, webUserId }: { children: React.ReactNod
       .single();
     if (e) {
       setUser(null);
+      setError(getSupabaseErrorMessage(e, 'Не удалось загрузить профиль'));
       return;
     }
+    setError(null);
     setUser(data as DbUser);
   }, []);
 
@@ -195,7 +200,10 @@ export function UserProvider({ children, webUserId }: { children: React.ReactNod
       ]);
 
       if (userRes.data) setUser(userRes.data as DbUser);
-      else setUser(null);
+      else {
+        setUser(null);
+        if (userRes.error) setError(getSupabaseErrorMessage(userRes.error, 'Не удалось загрузить профиль'));
+      }
 
       if (settingsRes.data) setSettings(settingsRes.data as SettingsRow);
       else setSettings({ support_username: 'Support', min_deposit: 100, min_withdraw: 500, bank_details: null });
@@ -209,9 +217,26 @@ export function UserProvider({ children, webUserId }: { children: React.ReactNod
   }, [tgid, webUserId]);
 
   // Realtime: мгновенное обновление баланса и режима win/lose при изменении в БД
+  // При ошибке подписки (таблица не в publication) — один раз предупреждение в консоль и fallback на polling раз в 30 с
   useEffect(() => {
     const userId = user?.user_id;
     if (userId == null) return;
+
+    const REALTIME_WARN_MSG =
+      '[Sellbit] Realtime subscription failed for users table. Run: ALTER PUBLICATION supabase_realtime ADD TABLE public.users; Falling back to polling every 30s.';
+    let realtimeWarned = false;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      if (pollInterval != null) return;
+      if (!realtimeWarned) {
+        realtimeWarned = true;
+        console.warn(REALTIME_WARN_MSG);
+      }
+      pollInterval = setInterval(() => {
+        refreshUser();
+      }, 30_000);
+    };
 
     const channel = supabase
       .channel(`user:${userId}`)
@@ -243,12 +268,20 @@ export function UserProvider({ children, webUserId }: { children: React.ReactNod
           });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          startPolling();
+        }
+      });
 
     return () => {
+      if (pollInterval != null) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [user?.user_id]);
+  }, [user?.user_id, refreshUser]);
 
   const [minDepositUsd, setMinDepositUsd] = useState(10);
   useEffect(() => {

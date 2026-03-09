@@ -59,13 +59,19 @@ export function PinProvider({ children }: { children: React.ReactNode }) {
     <PinContext.Provider value={value}>
       {children}
       {modal && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full bg-[#111] border-t border-white/10 rounded-t-2xl px-6 pt-6 pb-8 animate-slide-up pb-safe max-w-md">
-            <div className="flex justify-between items-center mb-6">
+        <div
+          className="fullscreen-overlay flex flex-col items-center justify-end sm:justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0)' }}
+        >
+          <div
+            className="w-full max-w-md bg-card border-t border-border rounded-t-2xl sm:rounded-2xl px-6 pt-6 pb-8 animate-sheet-up sm:animate-modal-in shadow-2xl max-h-[90dvh] overflow-y-auto scroll-app"
+            style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+          >
+            <div className="flex justify-between items-center mb-6 touch-target">
               <h3 className="text-lg font-bold text-white">{modal.title}</h3>
               <button
                 onClick={handleClose}
-                className="text-neutral-500 hover:text-white p-1"
+                className="touch-target p-2 -mr-2 rounded-xl text-textMuted hover:text-white hover:bg-white/10 active:scale-95 transition-all flex items-center justify-center"
                 aria-label="Закрыть"
               >
                 <X size={22} />
@@ -78,7 +84,7 @@ export function PinProvider({ children }: { children: React.ReactNode }) {
               error={error}
             />
             {error && (
-              <p className="text-center text-red-500 text-sm mt-3">Неверный пароль</p>
+              <p className="text-center text-red-400 text-sm mt-4 font-medium">Неверный пароль</p>
             )}
           </div>
         </div>

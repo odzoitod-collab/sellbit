@@ -35,7 +35,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onNext }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#050505] flex flex-col items-center justify-center px-8 animate-fade-in overflow-hidden">
+    <div className="fixed inset-0 z-[200] bg-background flex flex-col items-center justify-center px-8 animate-fade-in overflow-hidden">
       {/* Фон */}
       <div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-72 h-72 bg-neon/5 rounded-full blur-[120px] pointer-events-none transition-opacity duration-500"

@@ -33,8 +33,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col">
-      <header className="flex items-center px-4 py-3 border-b border-white/[0.06] bg-[#050505]">
+    <div className="min-h-screen bg-background text-white flex flex-col">
+      <header className="flex items-center px-4 py-3 border-b border-white/[0.06] bg-background">
         <button onClick={onBack} className="p-1.5 -ml-1.5 rounded-lg text-neutral-400 hover:text-white">
           <ArrowLeft size={20} strokeWidth={2} />
         </button>
@@ -51,7 +51,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSuccess }) => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="example@mail.com"
               autoComplete="email"
-              className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
+              className="w-full py-3 px-4 bg-card border border-border rounded-xl text-white placeholder-textSecondary focus:border-neon focus:outline-none"
             />
           </div>
           <div>
@@ -62,7 +62,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSuccess }) => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="w-full py-3 px-4 bg-white/[0.05] border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:border-neon/50 focus:outline-none"
+              className="w-full py-3 px-4 bg-card border border-border rounded-xl text-white placeholder-textSecondary focus:border-neon focus:outline-none"
             />
           </div>
           <button

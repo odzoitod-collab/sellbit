@@ -53,14 +53,14 @@ const AssetTable: React.FC<AssetTableProps> = ({
   return (
     <div className="flex flex-col w-full relative">
       {!hideFilterBar && (
-        <div className="sticky top-[73px] z-40 bg-[#050505] py-2 mb-1 -mx-4 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <Filter size={14} className="text-neutral-500 flex-shrink-0" />
+        <div className="sticky top-[73px] z-40 bg-background py-2 mb-1 -mx-4 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <Filter size={14} className="text-textMuted flex-shrink-0" />
           {filters.map((filter) => (
             <button
               key={filter.key}
               onClick={() => { Haptic.tap(); setInternalFilter(filter.key); }}
-              className={`text-xs font-mono uppercase tracking-wide px-3 py-1.5 rounded-md whitespace-nowrap active:scale-95 transition-colors ${
-                activeFilter === filter.key ? 'bg-white/10 text-neon' : 'text-neutral-500 hover:text-neutral-300'
+              className={`text-xs font-mono uppercase tracking-cap px-3 py-2 rounded-lg whitespace-nowrap active:scale-[0.98] transition-etoro ${
+                activeFilter === filter.key ? 'bg-card text-neon border border-neon' : 'text-textSecondary hover:text-textPrimary bg-transparent border border-transparent'
               }`}
             >
               {t(filter.labelKey)}
@@ -69,36 +69,36 @@ const AssetTable: React.FC<AssetTableProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-1 text-[10px] uppercase tracking-wider text-neutral-500 mb-0.5 px-1">
+      <div className="grid grid-cols-12 gap-1 text-cap font-mono text-textSecondary mb-1 px-1">
         <div className="col-span-5 text-left">{t('pair')}</div>
         <div className="col-span-3 text-right">{t('price')}</div>
         <div className="col-span-4 text-right">{t('change_24h')}</div>
       </div>
 
-      <div className="flex flex-col gap-0.5 pb-4">
+      <div className="flex flex-col gap-2 pb-6">
         {sortedAssets.map((asset) => (
           <div
             key={asset.id}
             onClick={() => { Haptic.tap(); onAssetClick?.(asset); }}
-            className="grid grid-cols-12 gap-1 items-center py-2.5 px-2 rounded-lg bg-white/[0.02] active:bg-white/[0.06] transition-colors cursor-pointer group"
+            className="grid grid-cols-12 gap-1 items-center min-h-[56px] py-4 px-4 rounded-card bg-card border border-border cursor-pointer group transition-all duration-150 hover:bg-surface active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/30"
           >
-            <div className="col-span-5 flex flex-col min-w-0">
-              <span className="text-sm font-bold text-white group-hover:text-neon transition-colors truncate">
+            <div className="col-span-5 flex flex-col min-w-0 gap-0.5">
+              <span className="text-sm font-semibold tracking-heading text-textPrimary group-hover:text-neon transition-etoro truncate">
                 {asset.ticker}
               </span>
-              <span className="text-[10px] text-neutral-500 truncate">{asset.name}</span>
+              <span className="text-[10px] text-textSecondary truncate">{asset.name}</span>
             </div>
-            <div className="col-span-3 flex flex-col items-end justify-center">
-              <span className="text-xs font-mono text-white tabular-nums">
-                {formatPrice(asset.price)}
+            <div className="col-span-3 flex flex-col items-end justify-center gap-0.5">
+              <span className="text-xs font-mono font-medium text-textPrimary tabular-nums">
+                {asset.priceUnavailable ? '—' : formatPrice(asset.price)}
               </span>
-              <span className="text-[9px] text-neutral-500">{symbol}</span>
+              <span className="text-[9px] text-textSecondary">{symbol}</span>
             </div>
-            <div className="col-span-4 flex flex-col items-end justify-center">
-              <span className={`text-xs font-mono tabular-nums ${asset.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {asset.change24h > 0 ? '+' : ''}{asset.change24h.toFixed(2)}%
+            <div className="col-span-4 flex flex-col items-end justify-center gap-0.5">
+              <span className={`text-xs font-mono font-medium tabular-nums ${(asset.change24h ?? 0) >= 0 ? 'text-up' : 'text-down'}`}>
+                {asset.change24h > 0 ? '+' : ''}{(asset.change24h ?? 0).toFixed(2)}%
               </span>
-              <span className="text-[9px] text-neutral-500">{formatVol(asset.volume24h)}</span>
+              <span className="text-[9px] text-textSecondary">{formatVol(asset.volume24h)}</span>
             </div>
           </div>
         ))}

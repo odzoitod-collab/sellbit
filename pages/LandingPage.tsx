@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogIn, UserPlus, Shield, Zap } from 'lucide-react';
+import { LogIn, UserPlus, Shield } from 'lucide-react';
 
 const WEBAPP_URL = (import.meta as any).env?.VITE_WEBAPP_URL || window.location.origin;
 
@@ -11,14 +11,15 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ refId, onLogin, onRegister }) => {
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col">
+    <div className="min-h-screen bg-background text-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-14 h-14 rounded-2xl bg-neon/20 flex items-center justify-center mb-6">
-          <Zap size={28} className="text-neon" />
+        <div className="w-14 h-14 rounded-2xl bg-[#21B053]/20 flex items-center justify-center gap-0.5 mb-6">
+          <span className="text-2xl font-bold text-[#21B053]">e</span>
+          <span className="text-2xl font-bold text-white">Toro</span>
         </div>
-        <h1 className="text-2xl font-bold text-center mb-2">Криптовалютная биржа</h1>
+        <h1 className="text-2xl font-bold text-center mb-2">eToro</h1>
         <p className="text-neutral-400 text-sm text-center mb-8 max-w-xs">
-          Официальная платформа. Безопасная торговля, мгновенные выводы.
+          Торгуйте криптовалютой, акциями и сырьём. Безопасная платформа, быстрый вывод.
         </p>
 
         <div className="w-full max-w-sm space-y-4 mb-8">

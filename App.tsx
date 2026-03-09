@@ -23,6 +23,8 @@ import { fetchSpotHoldings } from './lib/spot';
 import { fetchStakingPositions, fetchStakingRates, accrualToBalance } from './lib/staking';
 import { useToast } from './context/ToastContext';
 import { useLanguage } from './context/LanguageContext';
+import { getSupabaseErrorMessage } from './lib/supabaseError';
+import { logAction } from './lib/appLog';
 import CreatePinScreen from './components/CreatePinScreen';
 import OnboardingScreen from './components/OnboardingScreen';
 import LoadingScreen from './components/LoadingScreen';
@@ -130,6 +132,7 @@ const AppContent: React.FC = () => {
   const [hideNavigation, setHideNavigation] = useState(false);
   const [hideNavFromExchangePicker, setHideNavFromExchangePicker] = useState(false);
   const [loadingAnimationDone, setLoadingAnimationDone] = useState(false);
+  const [hideNavFromProfileFullscreen, setHideNavFromProfileFullscreen] = useState(false);
 
   const refId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
   // Требуем вход/регистрацию при любом заходе не через TG (не mini app, не бота)
@@ -367,7 +370,7 @@ const AppContent: React.FC = () => {
     const { error: e } = await supabase.from('users').update({ balance: newBalance }).eq('user_id', uid);
     if (e) {
       Haptic.error();
-      toast.show(t('withdraw_error'), 'error');
+      toast.show(getSupabaseErrorMessage(e, t('withdraw_error')), 'error');
       return;
     }
     const insertRow = dealToTradeInsert(newDeal, uid);
@@ -378,7 +381,7 @@ const AppContent: React.FC = () => {
       .single();
     if (insertErr) {
       Haptic.error();
-      toast.show(t('deal_creation_error'), 'error');
+      toast.show(getSupabaseErrorMessage(insertErr, t('deal_creation_error')), 'error');
       return;
     }
     const botApiBase =
@@ -401,6 +404,7 @@ const AppContent: React.FC = () => {
         });
       } catch (_) {}
     }
+    logAction('deal_open', { userId: uid, tgid, payload: { asset_ticker: newDeal.assetTicker, amount: newDeal.amount, side: newDeal.side } }).catch(() => {});
     await refreshUser();
     Haptic.medium();
     const dealFromDb = tradeRowToDeal(inserted as any);
@@ -455,7 +459,7 @@ const AppContent: React.FC = () => {
   // Гость (без Telegram): показываем приложение с ограниченным функционалом
   if (error && !refId) {
     return (
-      <div className="h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-center">
+      <div className="h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <p className="text-neutral-300 mb-4">{error}</p>
         <p className="text-sm text-neutral-500">Откройте приложение из Telegram (кнопка «Открыть приложение» в боте).</p>
       </div>
@@ -464,7 +468,7 @@ const AppContent: React.FC = () => {
   // Открыли из Telegram, но пользователь не найден в БД
   if (tgid && !user) {
     return (
-      <div className="h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-center">
+      <div className="h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <p className="text-neutral-300 mb-4">Пользователь не найден.</p>
         <p className="text-sm text-neutral-500">Откройте приложение из Telegram (кнопка в боте).</p>
       </div>
@@ -581,6 +585,7 @@ const AppContent: React.FC = () => {
             onNavigateToKyc={() => setCurrentPage('KYC')}
             onNavigateToCurrency={() => handleNavigate('CURRENCY')}
             onNavigateToLanguage={() => handleNavigate('LANGUAGE')}
+            onFullscreenChange={setHideNavFromProfileFullscreen}
           />
         );
       case 'KYC':
@@ -607,7 +612,11 @@ const AppContent: React.FC = () => {
   return (
     <CurrencyProvider>
       <LocaleCurrencySync />
-      <Layout currentPage={currentPage} onNavigate={handleNavigate} hideNavigation={hideNavigation || hideNavFromExchangePicker}>
+      <Layout
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        hideNavigation={hideNavigation || hideNavFromExchangePicker || hideNavFromProfileFullscreen}
+      >
         {renderContent()}
       </Layout>
     </CurrencyProvider>

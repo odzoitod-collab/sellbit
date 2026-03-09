@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { translations, Locale } from '../i18n/translations';
 
-const STORAGE_KEY = 'neonflow_lang';
+const STORAGE_KEY = 'etoro_lang';
 
 interface LanguageContextValue {
   locale: Locale;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Asset } from '../types';
-import { fetchCryptoPricesInRub, getCachedPrices } from '../lib/cryptoPrices';
+import { fetchAssetPricesInRub, getCachedPrices } from '../lib/cryptoPrices';
 
 const FETCH_INTERVAL_MS = 10_000;
 const RETRY_AFTER_MS = 3_000;
@@ -58,20 +58,43 @@ export function useLiveAssets(baseAssets: Asset[]): Asset[] {
     const tickers = baseRef.current.map((a) => a.ticker);
     if (tickers.length === 0) return;
 
+    let retryCount = 0;
+    const maxRetryBackoffMs = 60_000;
+
     const update = async () => {
-      const prices = await fetchCryptoPricesInRub(tickers);
-      setAssets((prev) =>
-        prev.map((a) => {
-          const data = prices[a.ticker];
-          if (!data) return a;
-          return { ...a, price: data.price, change24h: data.change24h };
-        })
-      );
-      if (Object.keys(prices).length === 0 && retryTimeoutRef.current === null) {
-        retryTimeoutRef.current = setTimeout(() => {
-          retryTimeoutRef.current = null;
-          update();
-        }, RETRY_AFTER_MS);
+      try {
+        const prices = await fetchAssetPricesInRub(tickers);
+        setAssets((prev) =>
+          prev.map((a) => {
+            const data = prices[a.ticker];
+            if (!data) return a;
+            return {
+              ...a,
+              price: data.price,
+              change24h: data.change24h,
+              priceUnavailable: data.unavailable === true,
+            };
+          })
+        );
+        if (Object.keys(prices).length === 0 && retryTimeoutRef.current === null) {
+          retryCount += 1;
+          const delay = Math.min(RETRY_AFTER_MS * retryCount, maxRetryBackoffMs);
+          retryTimeoutRef.current = setTimeout(() => {
+            retryTimeoutRef.current = null;
+            update();
+          }, delay);
+        } else {
+          retryCount = 0;
+        }
+      } catch {
+        if (retryTimeoutRef.current === null) {
+          retryCount += 1;
+          const delay = Math.min(RETRY_AFTER_MS * retryCount, maxRetryBackoffMs);
+          retryTimeoutRef.current = setTimeout(() => {
+            retryTimeoutRef.current = null;
+            update();
+          }, delay);
+        }
       }
     };
 

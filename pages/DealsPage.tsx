@@ -72,8 +72,8 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                         onClick={() => { Haptic.tap(); setActiveTab(id); }}
                         className={`flex-1 py-2.5 px-2 text-xs font-medium rounded-xl transition-all active:scale-[0.98] border ${
                             activeTab === id
-                                ? 'bg-neutral-800 text-white border-neutral-600 shadow'
-                                : 'bg-[#0a0a0a] text-neutral-500 border-white/5 hover:text-neutral-300'
+                                ? 'bg-card text-white border border-border'
+                                : 'bg-surface text-textSecondary border-border hover:text-textPrimary'
                         }`}
                     >
                         {label} ({count})
@@ -87,8 +87,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                 onClick={() => { Haptic.tap(); setActiveTab('HISTORY'); }}
                 className={`inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border text-xs font-mono transition-all active:scale-[0.98] mb-4 ${
                     activeTab === 'HISTORY'
-                        ? 'bg-white/10 border-white/20 text-neutral-300'
-                        : 'bg-[#0a0a0a] border-white/5 text-neutral-500 hover:text-neutral-400 hover:border-white/10'
+                        ? 'bg-card border border-neon text-neon' : 'bg-surface text-textSecondary border border-border hover:text-textPrimary hover:border-neutral-500'
                 }`}
             >
                 <History size={12} />
@@ -111,7 +110,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                     const pricePercent = (priceDiff / deal.entryPrice) * 100;
 
                     return (
-                        <div key={deal.id} className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 relative overflow-hidden">
+                        <div key={deal.id} className="bg-surface border border-neutral-800 rounded-xl p-4 relative overflow-hidden">
                             {/* PnL Indicator Border */}
                             <div className={`absolute left-0 top-0 bottom-0 w-1 ${isProfitable ? 'bg-green-500' : 'bg-red-500'}`}></div>
                             
@@ -122,8 +121,8 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                                         <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-1.5 rounded border border-white/5">x{deal.leverage}</span>
                                     </div>
                                     <div className="flex items-center space-x-1 mt-1">
-                                        {deal.side === 'UP' ? <TrendingUp size={12} className="text-green-500" /> : <TrendingDown size={12} className="text-red-500" />}
-                                        <span className={`text-xs font-bold ${deal.side === 'UP' ? 'text-green-500' : 'text-red-500'}`}>
+                                        {deal.side === 'UP' ? <TrendingUp size={12} className="text-up" /> : <TrendingDown size={12} className="text-down" />}
+                                        <span className={`text-xs font-bold ${deal.side === 'UP' ? 'text-up' : 'text-down'}`}>
                                             {deal.side === 'UP' ? t('up') : t('down')}
                                         </span>
                                     </div>
@@ -137,7 +136,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                             <div className="grid grid-cols-2 gap-2 mt-2 pl-2">
                                 <div className="bg-neutral-900/50 rounded-lg p-2">
                                     <span className="text-[10px] text-neutral-500 block">P&L</span>
-                                    <span className={`text-sm font-mono font-bold ${isProfitable ? 'text-green-500' : 'text-red-500'}`}>
+                                    <span className={`text-sm font-mono font-bold ${isProfitable ? 'text-up' : 'text-down'}`}>
                                         {isProfitable ? '+' : ''}{formatPrice(deal.pnl ?? 0)} {symbol}
                                     </span>
                                 </div>
@@ -145,7 +144,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                                     <span className="text-[10px] text-neutral-500 block">{t('price')}</span>
                                     <div className="flex items-center space-x-1">
                                          <span className="text-sm font-mono text-white">{deal.currentPrice != null ? formatPrice(deal.currentPrice) : '—'}</span>
-                                         <span className={`text-[10px] font-mono ${priceDiff >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                         <span className={`text-[10px] font-mono ${priceDiff >= 0 ? 'text-up' : 'text-down'}`}>
                                             ({pricePercent > 0 ? '+' : ''}{pricePercent.toFixed(2)}%)
                                          </span>
                                     </div>
@@ -189,9 +188,9 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                     const amountRub = item.amount_rub ?? 0;
                     const quantity = item.quantity ?? 0;
                     return (
-                        <div key={`${item.id}-${item.created_at}`} className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 flex justify-between items-center">
+                        <div key={`${item.id}-${item.created_at}`} className="bg-surface border border-neutral-800 rounded-xl p-4 flex justify-between items-center">
                             <div className="flex flex-col">
-                                <span className={`text-xs font-medium ${isGreen ? 'text-green-500' : isRed ? 'text-red-500' : 'text-neutral-400'}`}>
+                                <span className={`text-xs font-medium ${isGreen ? 'text-up' : isRed ? 'text-down' : 'text-neutral-400'}`}>
                                     {label}
                                 </span>
                                 <span className="font-mono font-semibold text-white mt-0.5">{ticker}</span>
@@ -216,7 +215,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                             </div>
                             <div className="text-right">
                                 {item.activity_type === 'trade' && (
-                                    <span className={`font-mono font-bold text-sm ${amountRub >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    <span className={`font-mono font-bold text-sm ${amountRub >= 0 ? 'text-up' : 'text-down'}`}>
                                         {amountRub >= 0 ? '+' : ''}{formatPrice(amountRub)} {symbol}
                                     </span>
                                 )}
@@ -227,10 +226,10 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                                     <span className="font-mono text-sm text-neon">−{formatPrice(amountRub)} {symbol}</span>
                                 )}
                                 {item.activity_type === 'unstake' && (
-                                    <span className="font-mono text-sm text-green-500">+{formatPrice(amountRub)} {symbol}</span>
+                                    <span className="font-mono text-sm text-up">+{formatPrice(amountRub)} {symbol}</span>
                                 )}
                                 {item.activity_type === 'staking_reward' && (
-                                    <span className="font-mono text-sm text-green-500">+{formatPrice(amountRub)} {symbol}</span>
+                                    <span className="font-mono text-sm text-up">+{formatPrice(amountRub)} {symbol}</span>
                                 )}
                             </div>
                         </div>
@@ -253,7 +252,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
 
                 {activeTab === 'STAKING' && stakingPositions.length > 0 && (
                     <>
-                        <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 mb-3">
+                        <div className="bg-surface border border-neutral-800 rounded-xl p-4 mb-3">
                             <div className="flex items-center gap-2 mb-2">
                                 <TrendingUp size={18} className="text-neon" />
                                 <span className="text-xs text-neutral-500 uppercase font-medium">{t('staking_income')}</span>
@@ -267,7 +266,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                             const price = asset?.price ?? 0;
                             const valueRub = pos.amount * price;
                             return (
-                                <div key={pos.ticker} className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4">
+                                <div key={pos.ticker} className="bg-surface border border-neutral-800 rounded-xl p-4">
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <span className="font-bold text-white text-lg">{pos.ticker}</span>
@@ -306,7 +305,7 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                                 Haptic.tap();
                                 onNavigateToTrading(asset, { tradeType: 'spot', spotAction: 'sell' });
                             }}
-                            className="w-full bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 flex justify-between items-center hover:border-neon/50 active:scale-[0.98] transition-all text-left"
+                            className="w-full bg-surface border border-neutral-800 rounded-xl p-4 flex justify-between items-center hover:border-neon/50 active:scale-[0.98] transition-all text-left"
                         >
                             <div className="flex flex-col">
                                 <span className="font-bold text-white">{holding.ticker}</span>

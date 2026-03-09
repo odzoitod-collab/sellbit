@@ -20,10 +20,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentPage, onNavigate }) => {
   ];
   return (
     <nav
-      className="fixed left-0 right-0 bottom-0 z-50 rounded-t-2xl bg-[#0a0a0a]/98 border-t border-x border-white/10 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.3)] pt-2"
-      style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))' }}
+      className="fixed left-0 right-0 bottom-0 z-50 rounded-t-2xl bg-card/95 backdrop-blur-md border-t border-x border-border pt-2 shadow-[0_-4px_24px_rgba(0,0,0,0.25)]"
+      style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))' }}
     >
-      <div className="flex justify-around items-center h-[50px] px-1">
+      <div className="flex justify-around items-center min-h-[56px] px-2">
         {navItems.map((item) => {
           const isActive = currentPage === item.id;
           const Icon = item.icon;
@@ -32,12 +32,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentPage, onNavigate }) => {
             <button
               key={item.id}
               onClick={() => { Haptic.tap(); onNavigate(item.id); }}
-              className="flex flex-col items-center justify-center flex-1 min-w-0 h-full space-y-0.5 active:scale-95 transition-transform"
+              className="touch-target flex flex-col items-center justify-center flex-1 min-w-0 py-2 active:scale-[0.96] transition-transform duration-150"
             >
-              <div className={`transition-all duration-200 ${isActive ? 'text-neon' : 'text-neutral-500'}`}>
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <div className={`transition-colors duration-200 ${isActive ? 'text-neon' : 'text-textMuted'}`}>
+                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
               </div>
-              <span className={`text-[9px] font-medium tracking-wide transition-colors duration-200 truncate w-full text-center leading-tight ${isActive ? 'text-neon' : 'text-neutral-600'}`}>
+              <span className={`text-[10px] font-semibold tracking-wide mt-0.5 transition-colors duration-200 truncate w-full text-center leading-tight ${isActive ? 'text-neon' : 'text-textSubtle'}`}>
                 {item.label}
               </span>
             </button>

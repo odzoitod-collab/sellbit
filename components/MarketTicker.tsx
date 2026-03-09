@@ -36,7 +36,7 @@ const MarketTicker: React.FC = () => {
           <span key={`${item.pair}-${start}-${i}`} className="text-[11px] font-mono flex items-center gap-1 leading-tight">
             <span className="text-white">{item.pair}/{currencyCode}</span>
             <span className="text-neutral-500">{formatPrice(item.priceRub)} {symbol}</span>
-            <span className={item.side === 'up' ? 'text-green-500' : 'text-red-500'}>{item.change}</span>
+            <span className={item.side === 'up' ? 'text-up' : 'text-down'}>{item.change}</span>
           </span>
         ))}
       </div>

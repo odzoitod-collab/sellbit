@@ -27,7 +27,7 @@ const SiteFooter: React.FC = () => {
       {/* Trust */}
       <div className="flex items-center gap-4 text-[10px] mb-4">
         <span className="flex items-center gap-1">
-          <Shield size={12} className="text-green-500/80" />
+          <Shield size={12} className="text-up/80" />
           {t('secure_connection')}
         </span>
         <span className="flex items-center gap-1">
@@ -47,7 +47,7 @@ const SiteFooter: React.FC = () => {
           {t('support')}
         </a>
         <span className="text-neutral-700">•</span>
-        <span>NeonFlow Exchange</span>
+        <span>eToro</span>
       </div>
     </footer>
   );

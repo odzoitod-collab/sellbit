@@ -87,7 +87,7 @@ const ExchangeAssetPicker: React.FC<ExchangeAssetPickerProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] bg-[#050505] flex flex-col animate-fade-in">
+    <div className="fixed inset-0 z-[70] bg-background flex flex-col animate-fade-in">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 flex-shrink-0">
         <h2 className="text-sm font-semibold text-white">{title}</h2>
         <button

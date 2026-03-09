@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getSupabaseErrorMessage } from './supabaseError';
 import type { StakingPosition, StakingRate } from '../types';
 
 function normalizePosition(row: {
@@ -83,7 +84,7 @@ export async function stake(
     p_ticker: ticker,
     p_quantity: quantity,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: getSupabaseErrorMessage(error, 'Ошибка операции') };
   const res = data as { ok?: boolean; error?: string; quantity?: number };
   return { ok: res?.ok === true, error: res?.error, quantity: res?.quantity };
 }
@@ -104,7 +105,7 @@ export async function unstake(
     p_ticker: ticker,
     p_price_rub: priceRub,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: getSupabaseErrorMessage(error, 'Ошибка операции') };
   const res = data as { ok?: boolean; error?: string; amount_returned?: number };
   return {
     ok: res?.ok === true,

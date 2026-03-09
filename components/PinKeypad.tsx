@@ -53,10 +53,10 @@ const PinKeypad: React.FC<PinKeypadProps> = ({ value, onChange, onSubmit, error,
         ))}
       </div>
 
-      {/* Виртуальная клавиатура — крупные кнопки, как в банковских приложениях */}
-      <div className="grid grid-cols-3 gap-4 w-full max-w-[320px]">
+      {/* Виртуальная клавиатура — крупные кнопки, мин. 48px по высоте */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 w-full max-w-[320px]">
         {DIGITS.map((d, i) => {
-          if (d === '') return <div key={i} />;
+          if (d === '') return <div key={`pin-empty-${i}`} />;
           if (d === 'back') {
             return (
               <button
@@ -64,9 +64,9 @@ const PinKeypad: React.FC<PinKeypadProps> = ({ value, onChange, onSubmit, error,
                 type="button"
                 onClick={backspace}
                 disabled={disabled}
-                className="h-[72px] rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 disabled:opacity-50 touch-manipulation hover:bg-white/10 transition-colors"
+                className="touch-target min-h-[56px] sm:min-h-[72px] rounded-2xl bg-card border border-border flex items-center justify-center active:scale-[0.96] disabled:opacity-50 transition-transform duration-150 hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/50"
               >
-                <Delete size={28} className="text-neutral-400" />
+                <Delete size={26} className="text-textMuted" />
               </button>
             );
           }
@@ -76,7 +76,7 @@ const PinKeypad: React.FC<PinKeypadProps> = ({ value, onChange, onSubmit, error,
               type="button"
               onClick={() => addDigit(d)}
               disabled={disabled}
-              className="h-[72px] rounded-2xl bg-white/5 border border-white/10 text-white text-2xl font-mono font-bold active:scale-95 disabled:opacity-50 hover:bg-white/10 transition-colors touch-manipulation"
+              className="touch-target min-h-[56px] sm:min-h-[72px] rounded-2xl bg-card border border-border text-white text-2xl font-mono font-bold active:scale-[0.96] disabled:opacity-50 transition-transform duration-150 hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/50"
             >
               {d}
             </button>

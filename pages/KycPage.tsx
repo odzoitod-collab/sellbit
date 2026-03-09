@@ -5,6 +5,7 @@ import { useUser } from '../context/UserContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
 import { sendVerificationToTelegram, canSendDepositToTelegram } from '../lib/telegramNotify';
+import { logAction } from '../lib/appLog';
 
 type KycStep = 'DOC_TYPE' | 'NAME' | 'DOC_PHOTO' | 'SELFIE' | 'SUCCESS';
 
@@ -122,6 +123,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
       setSubmittedOk(true);
       setStep('SUCCESS');
       toast.show(t('kyc_sent_ok'), 'success');
+      logAction('kyc_submit', { userId: user?.user_id ?? undefined, tgid: tgid ?? undefined, payload: { doc_type: docType } }).catch(() => {});
     } else {
       toast.show(result.error ?? t('kyc_send_error'), 'error');
     }
@@ -132,8 +134,8 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
   const progressPercent = showProgress ? ((stepIndex + 1) / (STEPS_ORDER.length - 1)) * 100 : 0;
 
   return (
-    <div className="flex flex-col h-full bg-[#050505] animate-fade-in">
-      <header className="flex items-center px-4 py-4 border-b border-white/5 bg-[#050505] sticky top-0 z-50">
+    <div className="flex flex-col h-full bg-background animate-fade-in">
+      <header className="flex items-center px-4 py-4 border-b border-white/5 bg-background sticky top-0 z-50">
         <button onClick={() => { Haptic.tap(); onBack(); }} className="text-neutral-400 hover:text-white mr-4 active:scale-90 transition-transform">
           <ArrowLeft size={24} />
         </button>
@@ -164,9 +166,9 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                 <button
                   key={d.id}
                   onClick={() => { Haptic.light(); setDocType(d.id); setStep('NAME'); }}
-                  className="w-full bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4 flex items-center gap-4 hover:border-neon/50 hover:bg-neutral-900/50 transition-all text-left group"
+                  className="w-full bg-surface border border-neutral-800 rounded-xl p-4 flex items-center gap-4 hover:border-neon/50 hover:bg-neutral-900/50 transition-all text-left group"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-neutral-800 flex items-center justify-center flex-shrink-0 group-hover:bg-neon/20">
+                  <div className="w-12 h-12 rounded-xl bg-card border border-border flex items-center justify-center flex-shrink-0 group-hover:border-neon">
                     <FileText size={22} className="text-neon" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -186,7 +188,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               <h2 className="text-xl font-bold text-white mb-1">{t('kyc_name_title')}</h2>
               <p className="text-neutral-500 text-sm">{t('kyc_name_desc')}</p>
             </div>
-            <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-4">
+            <div className="bg-surface border border-neutral-800 rounded-xl p-4">
               <label className="flex items-center gap-2 text-xs text-neutral-500 uppercase font-bold mb-2">
                 <User size={14} />
                 {t('kyc_fullname')}
@@ -218,7 +220,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               <h2 className="text-xl font-bold text-white mb-1">{t('kyc_doc_photo_title')}</h2>
               <p className="text-neutral-500 text-sm">{t('kyc_doc_photo_desc')}</p>
             </div>
-            <label className="block bg-[#0a0a0a] border-2 border-dashed border-neutral-700 rounded-2xl p-8 text-center cursor-pointer hover:border-neon/50 hover:bg-neutral-900/30 transition-all">
+            <label className="block bg-surface border-2 border-dashed border-neutral-700 rounded-2xl p-8 text-center cursor-pointer hover:border-neon/50 hover:bg-neutral-900/30 transition-all">
               <input
                 type="file"
                 accept="image/*"
@@ -231,9 +233,9 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               {docFile ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <Check size={28} className="text-green-500" />
+                    <Check size={28} className="text-up" />
                   </div>
-                  <span className="text-green-500 font-medium">{t('kyc_doc_uploaded')}</span>
+                  <span className="text-up font-medium">{t('kyc_doc_uploaded')}</span>
                   <span className="text-neutral-500 text-xs">{t('kyc_doc_replace')}</span>
                 </div>
               ) : (
@@ -299,14 +301,14 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                 <button
                   type="button"
                   onClick={captureSelfie}
-                  className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-green-600/20"
+                  className="w-full py-4 bg-neon hover:opacity-90 text-white font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
                 >
                   <Camera size={22} /> {t('kyc_take_photo')}
                 </button>
               )}
               {selfieFile && (
                 <>
-                  <p className="text-center text-green-500 text-sm mb-1">✓ {t('kyc_photo_ready')}</p>
+                  <p className="text-center text-up text-sm mb-1">✓ {t('kyc_photo_ready')}</p>
                   <button
                     type="button"
                     onClick={handleSubmit}
@@ -350,9 +352,9 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
         )}
 
         {step === 'SUCCESS' && (
-          <div className="bg-[#0a0a0a] border border-neutral-800 rounded-2xl p-8 text-center">
+          <div className="bg-surface border border-neutral-800 rounded-2xl p-8 text-center">
             <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-5">
-              <ShieldCheck size={40} className="text-green-500" />
+              <ShieldCheck size={40} className="text-up" />
             </div>
             {submittedOk ? (
               <>

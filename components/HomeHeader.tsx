@@ -19,11 +19,11 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ showBalanceTitle, balance, user
   const formattedBalance = formatPrice(balance, { fractionDigits: 0 });
 
   return (
-    <header className="sticky top-0 z-50 flex justify-between items-center py-4 px-4 bg-[#050505] border-b border-white/5 transition-all duration-300 shadow-md shadow-black/50">
+    <header className="sticky top-0 z-50 flex justify-between items-center py-4 px-4 bg-background border-b border-border transition-all duration-300">
       <button
         type="button"
         onClick={() => { Haptic.tap(); onProfileClick?.(); }}
-        className="flex items-center min-w-0 p-0 rounded-full hover:ring-2 hover:ring-neon/30 active:scale-95 transition-all"
+        className="touch-target flex items-center min-w-0 p-1 rounded-full hover:bg-card active:scale-[0.97] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/30"
       >
         {user?.photo_url ? (
           <img
@@ -40,18 +40,18 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ showBalanceTitle, balance, user
 
       <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 pointer-events-none">
         <div className={`flex flex-col items-center transition-opacity duration-300 ${showBalanceTitle ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 absolute'}`}>
-          <span className="text-base font-mono font-bold text-white tracking-tight">{formattedBalance} {symbol}</span>
+          <span className="text-base font-mono font-semibold text-textPrimary tracking-heading">{formattedBalance} {symbol}</span>
         </div>
         <div className={`flex flex-col items-center transition-opacity duration-300 ${!showBalanceTitle ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 absolute'}`}>
-          <span className="text-sm font-medium text-neutral-400 uppercase tracking-widest">{t('sellbit')}</span>
+          <span className="text-sm font-medium text-textSecondary uppercase tracking-cap">{t('sellbit')}</span>
         </div>
       </div>
 
       <button
         onClick={() => { Haptic.tap(); onSearch?.(); }}
-        className="h-10 w-10 rounded-full flex items-center justify-center hover:bg-neutral-800 active:bg-neutral-700 active:scale-95 transition-transform flex-shrink-0"
+        className="touch-target h-10 w-10 rounded-xl flex items-center justify-center hover:bg-card active:scale-[0.97] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/30 flex-shrink-0"
       >
-        <Search size={22} className="text-neutral-400" />
+        <Search size={22} className="text-textSecondary" />
       </button>
     </header>
   );

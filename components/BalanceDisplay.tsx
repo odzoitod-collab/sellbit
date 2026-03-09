@@ -22,10 +22,10 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({ balance, onCurrencyClic
       </span>
       
       <div className="flex items-baseline justify-center space-x-2 w-full max-w-[90vw] min-w-0">
-        <span className="text-5xl sm:text-6xl font-mono font-bold text-white tracking-tighter truncate min-w-0">
+        <span className="text-4xl sm:text-5xl lg:text-6xl font-mono font-bold text-white tracking-tighter tabular-nums truncate min-w-0">
           {formattedBalance}
         </span>
-        <span className="text-3xl font-mono text-neon font-light flex-shrink-0">{symbol}</span>
+        <span className="text-2xl sm:text-3xl font-mono text-neon font-medium flex-shrink-0 tabular-nums">{symbol}</span>
       </div>
       <button
         type="button"

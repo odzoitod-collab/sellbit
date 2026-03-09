@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import AssetTable, { FilterType } from '../components/AssetTable';
 import { MARKET_ASSETS } from '../constants';
-import { Asset } from '../types';
+import { Asset, AssetCategory } from '../types';
 import type { SpotHolding, StakingPosition, StakingRate } from '../types';
-import { Search, SlidersHorizontal, TrendingUp, X, Info } from 'lucide-react';
+import { Search, TrendingUp, Info } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { usePin } from '../context/PinContext';
 import { useUser } from '../context/UserContext';
 import { useWebAuth } from '../context/WebAuthContext';
@@ -40,16 +41,18 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
   onUnstakeModalChange,
 }) => {
   const { t } = useLanguage();
+  const { symbol, formatPrice } = useCurrency();
   const toast = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('Top');
+  const [assetTypeFilter, setAssetTypeFilter] = useState<'all' | AssetCategory>('all');
+  const [stakeScreen, setStakeScreen] = useState<{ ticker: string; maxAmount: number; ratePerMonth: number } | null>(null);
+  const [unstakeTicker, setUnstakeTicker] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const { requirePin } = usePin();
   const { tgid } = useUser();
   const { webUserId } = useWebAuth();
   const pinUserId = String(tgid ?? webUserId ?? '');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('Top');
-  const [stakeScreen, setStakeScreen] = useState<{ ticker: string; maxAmount: number; ratePerMonth: number } | null>(null);
-  const [unstakeTicker, setUnstakeTicker] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     onUnstakeModalChange?.(!!unstakeTicker);
@@ -57,6 +60,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
   }, [unstakeTicker, onUnstakeModalChange]);
 
   const liveMarket = useLiveAssets(MARKET_ASSETS);
+
+  const getCategory = (asset: Asset): AssetCategory => asset.category ?? 'crypto';
   const rateByTicker = useMemo(() => {
     const m: Record<string, StakingRate> = {};
     stakingRates.forEach((r) => { m[r.ticker] = r; });
@@ -78,14 +83,33 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
   ];
 
   const filteredAssets = useMemo(() => {
-    if (!searchQuery) return liveMarket;
-    const lowerQuery = searchQuery.toLowerCase();
-    return liveMarket.filter(
-      (asset) =>
-        asset.ticker.toLowerCase().includes(lowerQuery) ||
-        asset.name.toLowerCase().includes(lowerQuery)
-    );
-  }, [searchQuery, liveMarket]);
+    let base = liveMarket;
+
+    if (assetTypeFilter !== 'all') {
+      base = base.filter((asset) => getCategory(asset) === assetTypeFilter);
+    }
+
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      base = base.filter(
+        (a) =>
+          a.ticker.toLowerCase().includes(lowerQuery) ||
+          a.name.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    const sorted = [...base].sort((a, b) => {
+      switch (activeFilter) {
+        case 'Gainers': return b.change24h - a.change24h;
+        case 'Losers': return a.change24h - b.change24h;
+        case 'Vol': return b.volume24h - a.volume24h;
+        case 'New': return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0);
+        default: return 0;
+      }
+    });
+
+    return sorted;
+  }, [searchQuery, liveMarket, assetTypeFilter, activeFilter]);
 
   const handleOpenStake = (ticker: string) => {
     const holding = spotByTicker[ticker];
@@ -124,7 +148,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
 
   return (
     <div className="flex flex-col h-full animate-fade-in relative">
-      <div className="sticky top-0 z-50 bg-[#050505] shadow-[0_10px_30px_rgba(0,0,0,0.8)] pb-2">
+      <div className="sticky top-0 z-50 bg-background pb-2">
         <div className="px-4 pt-4 pb-2">
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -138,15 +162,12 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => Haptic.tap()}
-              className="block w-full pl-10 pr-3 py-3 bg-[#0a0a0a] border border-neutral-800 rounded-xl leading-5 text-white placeholder-neutral-600 focus:outline-none focus:border-neon/50 focus:ring-1 focus:ring-neon/50 focus:bg-neutral-900 transition-all font-mono text-sm"
+              className="block w-full pl-10 pr-3 py-3 bg-surface border border-neutral-800 rounded-xl leading-5 text-white placeholder-neutral-600 focus:outline-none focus:border-neon/50 focus:ring-1 focus:ring-neon/50 focus:bg-neutral-900 transition-all font-mono text-sm"
             />
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar px-4 py-2 border-b border-white/5">
-          <div className="pr-2 border-r border-white/10">
-            <SlidersHorizontal size={16} className="text-neutral-400" />
-          </div>
+        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar px-4 py-2 border-b border-border">
           {filters.map((filter) => (
             <button
               key={filter.key}
@@ -156,7 +177,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
               }}
               className={`
                 whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wide transition-all active:scale-95
-                ${activeFilter === filter.key ? 'bg-neon text-black font-bold shadow-[0_0_10px_rgba(163,230,53,0.3)]' : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/5'}
+                ${activeFilter === filter.key ? 'bg-neon text-black font-bold border border-neon' : 'text-textSecondary hover:text-textPrimary hover:bg-card border border-transparent'}
               `}
             >
               {t(filter.labelKey)}
@@ -175,7 +196,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                 {t('special_offer')} · {t('staking_title')}
               </span>
             </div>
-            <div className="rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
+            <div className="rounded-xl border border-white/10 bg-surface overflow-hidden">
               <div className="p-3 border-b border-white/5 flex items-start gap-2">
                 <Info size={14} className="text-neon flex-shrink-0 mt-0.5" />
                 <p className="text-[11px] text-neutral-400 leading-snug">
@@ -199,7 +220,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                       <button
                         key={ticker}
                         onClick={() => handleOpenStake(ticker)}
-                        className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-neon/10 border border-white/10 hover:border-neon/30 transition-all text-left min-w-0"
+                        className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg bg-card hover:bg-surface border border-border hover:border-neon transition-all text-left min-w-0"
                       >
                         <span className="font-mono font-semibold text-white text-sm">{ticker}</span>
                         <span className="text-[10px] font-mono text-neon">~{pct}%</span>
@@ -225,11 +246,11 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                         <div key={pos.ticker} className="flex items-center justify-between gap-2 py-1">
                           <span className="text-xs font-mono text-white">{pos.ticker}</span>
                           <span className="text-[10px] text-neutral-400 font-mono truncate flex-1 text-right mx-1">
-                            {pos.amount.toFixed(4)} {price > 0 && `≈ ${valueRub.toFixed(0)} ₽`}
+                            {pos.amount.toFixed(4)} {asset?.priceUnavailable ? '—' : price > 0 ? `≈ ${valueRub.toFixed(0)} ₽` : ''}
                           </span>
                           <button
                             onClick={(e) => { e.stopPropagation(); Haptic.tap(); setUnstakeTicker(pos.ticker); }}
-                            className="px-2 py-0.5 rounded text-[10px] font-mono border border-white/20 text-neutral-400 hover:bg-white/5"
+                            className="px-2 py-0.5 rounded text-[10px] font-mono border border-border text-textSecondary hover:bg-card"
                           >
                             {t('unstake_btn')}
                           </button>
@@ -285,19 +306,19 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         const amountRub = price * amount;
         return (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 p-4">
-            <div className="w-full max-w-sm rounded-2xl bg-[#0f0f0f] border border-white/10 p-4 shadow-xl">
+            <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-4">
               <h3 className="text-base font-semibold text-white mb-1">
                 {t('unstake_modal_title')}
               </h3>
               <p className="text-xs text-neutral-500 mb-3">
                 {unstakeTicker} · {t('unstake_you_receive')}:
               </p>
-              <div className="rounded-xl bg-[#0a0a0a] border border-white/10 p-3 mb-2">
+              <div className="rounded-xl bg-card border border-border p-3 mb-2">
                 <p className="text-lg font-mono font-bold text-neon">
                   {amount.toFixed(8)} {unstakeTicker}
                 </p>
                 <p className="text-[11px] text-neutral-500 mt-0.5">
-                  {price > 0 && `≈ ${amountRub.toFixed(0)} ₽`}
+                  {asset?.priceUnavailable ? '—' : price > 0 ? `≈ ${amountRub.toFixed(0)} ₽` : ''}
                 </p>
               </div>
               <p className="text-[10px] text-neutral-500 mb-4">
@@ -306,7 +327,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
               <div className="flex gap-3">
                 <button
                   onClick={() => { Haptic.tap(); setUnstakeTicker(null); }}
-                  className="flex-1 py-3 rounded-xl border border-white/20 text-neutral-300 font-medium text-sm"
+                  className="flex-1 py-3 rounded-xl border border-border text-textSecondary font-medium text-sm hover:bg-card"
                 >
                   {t('cancel')}
                 </button>

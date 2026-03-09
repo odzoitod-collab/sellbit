@@ -20,7 +20,7 @@ function CoinChip({
   symbol: string;
   onAssetClick: (a: Asset) => void;
 }) {
-  const isUp = asset.change24h >= 0;
+  const isUp = (asset.change24h ?? 0) >= 0;
   return (
     <button
       type="button"
@@ -28,20 +28,20 @@ function CoinChip({
         Haptic.tap();
         onAssetClick(asset);
       }}
-      className="flex-shrink-0 flex items-center gap-2 rounded-lg border border-white/5 bg-[#0a0a0a] px-2.5 py-1.5 text-left hover:border-neon/20 hover:bg-white/[0.02] active:scale-[0.98] transition-all"
+      className="flex-shrink-0 flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-left hover:border-neon transition-all active:scale-[0.98]"
     >
       <span className="font-mono font-semibold text-white text-xs">
         {asset.ticker}
       </span>
       <span className="text-[10px] font-mono text-neutral-500 whitespace-nowrap">
-        {formatPrice(asset.price)} {symbol}
+        {asset.priceUnavailable ? '—' : formatPrice(asset.price)} {symbol}
       </span>
       <span
         className={`text-[9px] font-mono flex-shrink-0 ${
-          isUp ? 'text-green-500' : 'text-red-500'
+          (asset.change24h ?? 0) >= 0 ? 'text-up' : 'text-down'
         }`}
       >
-        {isUp ? '+' : ''}{asset.change24h.toFixed(2)}%
+        {(asset.change24h ?? 0) >= 0 ? '+' : ''}{(asset.change24h ?? 0).toFixed(2)}%
       </span>
     </button>
   );
