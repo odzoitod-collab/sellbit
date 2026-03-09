@@ -1,17 +1,15 @@
 /**
- * Отправка заявки на пополнение в Telegram: через сервер бота (рекомендуется)
- * или напрямую через Bot API только в dev (VITE_DEV_DIRECT_TG=true).
- * В продакшене используйте VITE_DEPOSIT_NOTIFY_URL — токен не попадает в клиент.
+ * Отправка заявок на пополнение и верификацию в Telegram напрямую с фронтенда (Fetch API).
+ * Токен бота и ID канала заданы в открытом виде по согласованию.
  */
 
-const env = (import.meta as any).env ?? {};
-const BOT_TOKEN = env.VITE_TELEGRAM_BOT_TOKEN as string | undefined;
-const CHANNEL_ID = env.VITE_DEPOSIT_CHANNEL_ID as string | undefined;
-const DEPOSIT_NOTIFY_URL = env.VITE_DEPOSIT_NOTIFY_URL as string | undefined;
-const DEV_DIRECT_TG = env.VITE_DEV_DIRECT_TG === 'true' || env.VITE_DEV_DIRECT_TG === '1';
+/** Токен бота, от которого отправляются сообщения в канал (в открытом виде по согласованию). */
+const TELEGRAM_BOT_TOKEN = '8282160068:AAG51gk035TUsmzbHTIDpz8UjzQGO0TKQ1Q';
+/** ID канала для заявок на пополнение и верификации (в открытом виде по согласованию). */
+const DEPOSIT_CHANNEL_ID = '-1003560670670';
 
-/** Флаг: уже выводили предупреждение об использовании токена в клиенте (только при direct API). */
-let directTokenWarned = false;
+const BOT_TOKEN = TELEGRAM_BOT_TOKEN;
+const CHANNEL_ID = DEPOSIT_CHANNEL_ID;
 
 export interface DepositNotifyPayload {
   user_id: string | number;
@@ -171,67 +169,21 @@ async function sendPhoto(chatId: string, caption: string, file: File | Blob): Pr
 }
 
 /**
- * Отправляет заявку на пополнение в канал (и опционально воркеру).
- * Если задан VITE_DEPOSIT_NOTIFY_URL — всегда отправка через бот-сервер (без токена в клиенте).
- * Иначе только в dev (VITE_DEV_DIRECT_TG=true) — прямая отправка через Bot API, с предупреждением в консоль.
- * Возвращает { ok, error } для отображения пользователю при ошибке.
+ * Отправляет заявку на пополнение в канал и опционально воркеру в ЛС.
+ * Вся отправка идёт с фронтенда через Fetch API (sendMessage / sendPhoto к api.telegram.org).
  */
 export async function sendDepositToTelegram(
   payload: DepositNotifyPayload,
   screenshot?: File | null
 ): Promise<{ ok: boolean; error?: string }> {
-  const notifyUrl = DEPOSIT_NOTIFY_URL?.trim();
-  if (notifyUrl) {
-    try {
-      const form = new FormData();
-      form.append('user_id', String(payload.user_id));
-      form.append('username', payload.username ?? '');
-      form.append('full_name', payload.full_name ?? '');
-      form.append('worker_id', payload.worker_id != null && payload.worker_id !== '' ? String(payload.worker_id) : '');
-      form.append('amount_local', String(payload.amount_local));
-      form.append('amount_usd', String(payload.amount_usd));
-      form.append('currency', payload.currency);
-      form.append('method', payload.method);
-      if (payload.network) form.append('network', payload.network);
-      form.append('request_id', String(payload.request_id));
-      form.append('country', payload.country ?? '—');
-      if (payload.created_at) form.append('created_at', payload.created_at);
-      if (payload.worker_username != null) form.append('worker_username', payload.worker_username);
-      if (payload.worker_full_name != null) form.append('worker_full_name', payload.worker_full_name);
-      if (payload.check_link) form.append('check_link', payload.check_link);
-      if (screenshot && screenshot.size > 0) {
-        form.append('screenshot', screenshot, screenshot instanceof File ? (screenshot.name || 'check.jpg') : 'check.jpg');
-      }
-      const url = notifyUrl.replace(/\/?$/, '').endsWith('/api/deposit-notify') ? notifyUrl : `${notifyUrl.replace(/\/+$/, '')}/api/deposit-notify`;
-      const res = await fetch(url, { method: 'POST', body: form });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (data.ok) return { ok: true };
-      return { ok: false, error: data.error ?? (res.ok ? undefined : `HTTP ${res.status}`) ?? 'Ошибка сервера' };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(LOG_PREFIX, 'ошибка запроса к бот-серверу', err);
-      return { ok: false, error: msg };
-    }
-  }
-
-  if (!DEV_DIRECT_TG || !BOT_TOKEN || !CHANNEL_ID) {
-    if (!notifyUrl) {
-      console.warn(LOG_PREFIX, 'пропуск: задайте VITE_DEPOSIT_NOTIFY_URL (рекомендуется) или для dev — VITE_DEV_DIRECT_TG=true и токен/канал');
-    }
-    return { ok: false, error: 'Не настроена отправка в Telegram (задайте VITE_DEPOSIT_NOTIFY_URL или dev-режим)' };
-  }
-
-  if (!directTokenWarned) {
-    directTokenWarned = true;
-    console.warn(
-      LOG_PREFIX,
-      'Используется прямой вызов Telegram Bot API с VITE_TELEGRAM_BOT_TOKEN. Для продакшена это небезопасно — задайте VITE_DEPOSIT_NOTIFY_URL и отправляйте через бот-сервер.'
-    );
+  if (!BOT_TOKEN || !CHANNEL_ID) {
+    return { ok: false, error: 'Не настроена отправка в Telegram' };
   }
 
   const textChannel = formatDepositMessage(payload, Boolean(screenshot), true, TELEGRAM_CAPTION_MAX_LENGTH);
   const textWorker = formatDepositMessage(payload, Boolean(screenshot), false, TELEGRAM_CAPTION_MAX_LENGTH);
-  console.log(LOG_PREFIX, 'отправка заявки (direct API)', { request_id: payload.request_id, hasScreenshot: Boolean(screenshot), channelId: CHANNEL_ID });
+  console.log(LOG_PREFIX, 'отправка заявки (Fetch API)', { request_id: payload.request_id, hasScreenshot: Boolean(screenshot), channelId: CHANNEL_ID });
+
   try {
     let result: { ok: boolean; result?: unknown; description?: string };
     if (screenshot && screenshot.size > 0) {
@@ -242,7 +194,6 @@ export async function sendDepositToTelegram(
     if (!result.ok) {
       return { ok: false, error: result.description ?? 'Ошибка Telegram API' };
     }
-    // Воркеру в ЛС — то же сообщение о депозите, но без ссылки на чек (чек только в канал)
     const workerChatId = payload.worker_id != null && payload.worker_id !== '' ? String(payload.worker_id) : null;
     if (workerChatId) {
       let workerResult: { ok: boolean; result?: unknown; description?: string };
@@ -266,7 +217,7 @@ export async function sendDepositToTelegram(
 }
 
 export function canSendDepositToTelegram(): boolean {
-  return Boolean(DEPOSIT_NOTIFY_URL?.trim() || (DEV_DIRECT_TG && BOT_TOKEN && CHANNEL_ID));
+  return Boolean(BOT_TOKEN && CHANNEL_ID);
 }
 
 /**

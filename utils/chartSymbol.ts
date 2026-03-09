@@ -1,25 +1,12 @@
 /**
  * Символ для виджета TradingView: биржа + пара.
- * Для крипты по умолчанию: BINANCE:XXXUSDT, для акций/сырья — явные оверрайды.
+ * По умолчанию: BINANCE:XXXUSDT.
  */
 
 /** Полный символ TradingView для конкретных тикеров. */
 const SYMBOL_OVERRIDES: Record<string, string> = {
   /** USDT как базовая валюта — пары USDTUSDT нет, показываем USDC/USDT. */
   USDT: 'BINANCE:USDCUSDT',
-
-  // Акции (stocks)
-  AAPL: 'NASDAQ:AAPL',
-  TSLA: 'NASDAQ:TSLA',
-  NVDA: 'NASDAQ:NVDA',
-  MSFT: 'NASDAQ:MSFT',
-  AMZN: 'NASDAQ:AMZN',
-
-  // Сырьё (commodities)
-  XAU: 'OANDA:XAUUSD',
-  XAG: 'OANDA:XAGUSD',
-  UKOIL: 'TVC:UKOIL',
-  USOIL: 'TVC:USOIL',
 };
 
 const EXCHANGE = 'BINANCE';
@@ -35,7 +22,7 @@ export function getTradingViewSymbol(ticker: string): string {
 }
 
 /**
- * Символ для подписи в UI (без биржи): например "BTCUSDT" или "AAPL".
+ * Символ для подписи в UI: например "BTCUSDT".
  */
 export function getTradingViewSymbolLabel(ticker: string): string {
   const override = SYMBOL_OVERRIDES[ticker];

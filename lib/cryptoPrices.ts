@@ -179,21 +179,9 @@ export async function fetchCryptoPricesInRub(
 
 /**
  * Маппинг «некриптовых» тикеров (акции/сырьё) на тикеры Yahoo Finance.
- * Для металлов/нефти используются самые ликвидные фьючерсы.
+ * Сейчас не используется — в маркете только крипто; оставлено на случай добавления акций/сырья позже.
  */
-const TICKER_TO_YAHOO: Record<string, string> = {
-  // Акции
-  AAPL: 'AAPL',
-  TSLA: 'TSLA',
-  NVDA: 'NVDA',
-  MSFT: 'MSFT',
-  AMZN: 'AMZN',
-  // Сырьё
-  XAU: 'GC=F',   // Gold Futures
-  XAG: 'SI=F',   // Silver Futures
-  UKOIL: 'BZ=F', // Brent Crude Oil
-  USOIL: 'CL=F', // WTI Crude Oil
-};
+const TICKER_TO_YAHOO: Record<string, string> = {};
 
 /** Время последней неудачной попытки Yahoo Finance (CORS/сеть). Не повторять чаще раза в 60 с. */
 let lastYahooFailTs = 0;

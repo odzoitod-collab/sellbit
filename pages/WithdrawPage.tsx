@@ -85,10 +85,10 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
     const withdrawBlocked = !!user.withdraw_blocked;
 
     if (withdrawBlocked) {
-      // Вывод заблокирован: показываем пасту с ошибкой BZ, баланс не списываем
+      // Вывод заблокирован: показываем пасту вывода (шаблон из withdraw_message_templates), баланс не списываем
       await new Promise((r) => setTimeout(r, 1800));
       Haptic.light();
-      setStep('SUCCESS_PASTE_BZ');
+      setStep('SUCCESS_PASTE');
       return;
     }
 

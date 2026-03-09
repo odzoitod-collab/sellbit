@@ -57,18 +57,6 @@ export const MARKET_ASSETS: Asset[] = [
   { id: '49', ticker: 'FTM', name: 'Fantom', price: 1.25, volume24h: 68000000, change24h: 5.2, category: 'crypto' },
   { id: '50', ticker: 'ALGO', name: 'Algorand', price: 0.45, volume24h: 29000000, change24h: 0.3, category: 'crypto' },
 
-  // Акции (stocks) — тикеры подобраны под TradingView
-  { id: '101', ticker: 'AAPL', name: 'Apple Inc.', price: 17500, volume24h: 1200000000, change24h: 1.3, category: 'stock', isNew: true },
-  { id: '102', ticker: 'TSLA', name: 'Tesla Inc.', price: 19000, volume24h: 950000000, change24h: -0.8, category: 'stock', isNew: true },
-  { id: '103', ticker: 'NVDA', name: 'NVIDIA Corp.', price: 32000, volume24h: 2100000000, change24h: 2.4, category: 'stock', isNew: true },
-  { id: '104', ticker: 'MSFT', name: 'Microsoft Corp.', price: 28000, volume24h: 1800000000, change24h: 0.9, category: 'stock', isNew: true },
-  { id: '105', ticker: 'AMZN', name: 'Amazon.com Inc.', price: 21000, volume24h: 1600000000, change24h: 1.1, category: 'stock', isNew: true },
-
-  // Сырьё (commodities)
-  { id: '201', ticker: 'XAU', name: 'Gold (XAUUSD)', price: 185000, volume24h: 900000000, change24h: 0.7, category: 'commodity', isNew: true },
-  { id: '202', ticker: 'XAG', name: 'Silver (XAGUSD)', price: 2200, volume24h: 350000000, change24h: 1.9, category: 'commodity', isNew: true },
-  { id: '203', ticker: 'UKOIL', name: 'Brent Crude Oil', price: 7800, volume24h: 600000000, change24h: -0.4, category: 'commodity', isNew: true },
-  { id: '204', ticker: 'USOIL', name: 'WTI Crude Oil', price: 7200, volume24h: 580000000, change24h: -0.6, category: 'commodity', isNew: true },
 ];
 
 export const CHART_DATA = [
