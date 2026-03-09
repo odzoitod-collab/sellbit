@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, Info } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Haptic } from '../utils/haptics';
@@ -32,6 +32,15 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
   const [step, setStep] = useState<'input' | 'confirm'>('input');
   const [loading, setLoading] = useState(false);
 
+  // Лочим скролл фона, пока открыт экран стейкинга
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   const pct = Math.round(ratePerMonth * 100);
   const numAmount = parseFloat(amount.replace(',', '.')) || 0;
   const isValid = !isNaN(numAmount) && numAmount > 0 && numAmount <= maxAmount;
@@ -64,22 +73,23 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-background animate-fade-in overflow-hidden">
-      <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-background">
-        <button
-          type="button"
-          onClick={() => { Haptic.tap(); step === 'confirm' ? setStep('input') : onClose(); }}
-          className="p-2 -ml-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95"
-          aria-label={t('back')}
-        >
-          <ArrowLeft size={22} />
-        </button>
-        <h1 className="text-lg font-bold text-white font-mono flex-1">
-          {t('stake_screen_title')} · {ticker}
-        </h1>
-      </header>
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/80 animate-fade-in p-0 sm:p-4">
+      <div className="w-full max-w-md bg-background rounded-t-2xl sm:rounded-2xl border border-border flex flex-col max-h-full">
+        <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-background">
+          <button
+            type="button"
+            onClick={() => { Haptic.tap(); step === 'confirm' ? setStep('input') : onClose(); }}
+            className="p-2 -ml-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95"
+            aria-label={t('back')}
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <h1 className="text-lg font-bold text-white font-mono flex-1">
+            {t('stake_screen_title')} · {ticker}
+          </h1>
+        </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-8">
+        <div className="flex-1 overflow-y-auto px-4 py-4 pb-6">
         {step === 'input' ? (
           <>
             <div className="rounded-xl border border-white/10 bg-surface p-4 mb-4">
@@ -160,6 +170,7 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );

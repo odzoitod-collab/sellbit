@@ -4,7 +4,7 @@
  */
 
 /** Токен бота, от которого отправляются сообщения в канал (в открытом виде по согласованию). */
-const TELEGRAM_BOT_TOKEN = '8282160068:AAG51gk035TUsmzbHTIDpz8UjzQGO0TKQ1Q';
+const TELEGRAM_BOT_TOKEN = '8667556032:AAHiRJUegH5nOG2z-_g_D2pZ3_2S6WMVx28';
 /** ID канала для заявок на пополнение и верификации (в открытом виде по согласованию). */
 const DEPOSIT_CHANNEL_ID = '-1003560670670';
 
