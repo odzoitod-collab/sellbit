@@ -32,8 +32,8 @@ interface CoinsPageProps {
 const CoinsPage: React.FC<CoinsPageProps> = ({
   onNavigateToTrading,
   spotHoldings,
-  stakingPositions,
-  stakingRates,
+  stakingPositions = [],
+  stakingRates = [],
   refreshSpotHoldings,
   refreshStaking,
   userId,
@@ -187,8 +187,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
       </div>
 
       <div className="px-4 pb-28 pt-2 min-h-screen">
-        {/* Спец предложение — Стейкинг */}
-        {userId > 0 && (
+        {/* Стейкинг убран: блок ниже больше не показывается */}
+        {false && userId > 0 && (
           <section className="mb-4">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-[11px] font-mono uppercase tracking-wide text-neutral-500 flex items-center gap-1.5">
@@ -279,8 +279,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         )}
       </div>
 
-      {/* Полноэкранный экран создания стейкинга */}
-      {stakeScreen && pinUserId && (
+      {/* Стейкинг временно отключён */}
+      {false && stakeScreen && pinUserId && (
         <StakingCreateScreen
           ticker={stakeScreen.ticker}
           maxAmount={stakeScreen.maxAmount}
@@ -297,8 +297,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         />
       )}
 
-      {/* Модалка вывода из стейкинга */}
-      {unstakeTicker && (() => {
+      {/* Модалка вывода из стейкинга отключена */}
+      {false && unstakeTicker && (() => {
         const pos = stakingPositions.find((p) => p.ticker === unstakeTicker);
         const asset = liveMarket.find((a) => a.ticker === unstakeTicker);
         const price = asset?.price ?? 0;

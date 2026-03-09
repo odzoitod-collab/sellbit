@@ -21,7 +21,7 @@ interface DealsPageProps {
 const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPositions = [], userId, onNavigateToTrading }) => {
     const { formatPrice, symbol } = useCurrency();
     const { t } = useLanguage();
-    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY' | 'ASSETS' | 'STAKING'>('HISTORY');
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY' | 'ASSETS'>('HISTORY');
     const [now, setNow] = useState(Date.now());
     const [activityHistory, setActivityHistory] = useState<ActivityHistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -60,12 +60,11 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
         <div className="flex flex-col h-full animate-fade-in px-4 pt-4">
             <h1 className="text-xl font-bold text-white mb-4">{t('portfolio_title')}</h1>
 
-            {/* Вкладки: Активные, Мои активы, Стейкинг */}
+            {/* Вкладки: Активные, Мои активы */}
             <div className="flex gap-2 mb-3">
                 {[
                     { id: 'ACTIVE' as const, label: t('active_tab'), count: activeDeals.length },
                     { id: 'ASSETS' as const, label: t('my_assets'), count: spotHoldings.length },
-                    { id: 'STAKING' as const, label: t('staking_tab'), count: stakingPositions.length },
                 ].map(({ id, label, count }) => (
                     <button
                         key={id}
@@ -241,50 +240,6 @@ const DealsPage: React.FC<DealsPageProps> = ({ deals, spotHoldings, stakingPosit
                         <Wallet size={32} className="mb-2 opacity-20" />
                         <span className="text-xs">{t('no_spot_assets')}</span>
                     </div>
-                )}
-
-                {activeTab === 'STAKING' && stakingPositions.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-40 text-neutral-600">
-                        <Lock size={32} className="mb-2 opacity-20" />
-                        <span className="text-xs">{t('no_staking')}</span>
-                    </div>
-                )}
-
-                {activeTab === 'STAKING' && stakingPositions.length > 0 && (
-                    <>
-                        <div className="bg-surface border border-neutral-800 rounded-xl p-4 mb-3">
-                            <div className="flex items-center gap-2 mb-2">
-                                <TrendingUp size={18} className="text-neon" />
-                                <span className="text-xs text-neutral-500 uppercase font-medium">{t('staking_income')}</span>
-                            </div>
-                            <p className="text-[11px] text-neutral-500">
-                                {t('staking_rewards_to_balance')}
-                            </p>
-                        </div>
-                        {stakingPositions.map((pos) => {
-                            const asset = liveAssets.find((a) => a.ticker === pos.ticker) || MARKET_ASSETS.find((a) => a.ticker === pos.ticker);
-                            const price = asset?.price ?? 0;
-                            const valueRub = pos.amount * price;
-                            return (
-                                <div key={pos.ticker} className="bg-surface border border-neutral-800 rounded-xl p-4">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <span className="font-bold text-white text-lg">{pos.ticker}</span>
-                                            <p className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                                                {pos.amount.toFixed(6)} {pos.ticker}
-                                            </p>
-                                            {price > 0 && (
-                                                <p className="text-xs text-neutral-400 mt-1">
-                                                    ≈ {formatPrice(valueRub)} {symbol}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <Lock size={16} className="text-neutral-500 flex-shrink-0" />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </>
                 )}
 
                 {activeTab === 'ASSETS' && spotHoldings.length > 0 && spotHoldings.map((holding) => {

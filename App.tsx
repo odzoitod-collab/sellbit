@@ -11,7 +11,7 @@ import QRScannerPage from './pages/QRScannerPage';
 import ProfilePage from './pages/ProfilePage';
 import KycPage from './pages/KycPage';
 import { PageView, Asset, Deal, DealStatus } from './types';
-import type { SpotHolding, StakingPosition, StakingRate } from './types';
+import type { SpotHolding } from './types';
 import { MOCK_ASSETS, MARKET_ASSETS } from './constants';
 import { useLiveAssets } from './utils/useLiveAssets';
 import { Haptic } from './utils/haptics';
@@ -20,7 +20,6 @@ import { usePin } from './context/PinContext';
 import { supabase } from './lib/supabase';
 import { tradeRowToDeal, dealToTradeInsert } from './lib/trades';
 import { fetchSpotHoldings } from './lib/spot';
-import { fetchStakingPositions, fetchStakingRates, accrualToBalance } from './lib/staking';
 import { useToast } from './context/ToastContext';
 import { useLanguage } from './context/LanguageContext';
 import { getSupabaseErrorMessage } from './lib/supabaseError';
@@ -123,8 +122,6 @@ const AppContent: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [spotHoldings, setSpotHoldings] = useState<SpotHolding[]>([]);
-  const [stakingPositions, setStakingPositions] = useState<StakingPosition[]>([]);
-  const [stakingRates, setStakingRates] = useState<StakingRate[]>([]);
   const [tradingInitialState, setTradingInitialState] = useState<{ tradeType?: 'futures' | 'spot'; spotAction?: 'buy' | 'sell' } | null>(null);
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [pinCreated, setPinCreated] = useState(false);
@@ -176,23 +173,6 @@ const AppContent: React.FC = () => {
     refreshUser();
   }, [user, refreshUser]);
 
-  const refreshStaking = React.useCallback(async () => {
-    if (!user) return;
-    const stakingTickers = ['BTC', 'ETH', 'SOL'];
-    const pricesRub: Record<string, number> = {};
-    liveAssetsForTrading.forEach((a) => {
-      if (stakingTickers.includes(a.ticker) && a.price > 0) pricesRub[a.ticker] = a.price;
-    });
-    if (Object.keys(pricesRub).length > 0) await accrualToBalance(user.user_id, pricesRub);
-    const [positions, rates] = await Promise.all([
-      fetchStakingPositions(user.user_id),
-      fetchStakingRates(),
-    ]);
-    setStakingPositions(positions);
-    setStakingRates(rates);
-    refreshSpotHoldings();
-  }, [user, liveAssetsForTrading, refreshSpotHoldings]);
-
   const notifyReferralSpotBuy = React.useCallback((ticker: string, amountRub: number) => {
     const base =
       (import.meta as any).env?.VITE_BOT_API_URL?.replace(/\/+$/, '') ||
@@ -210,32 +190,9 @@ const AppContent: React.FC = () => {
     }).catch(() => {});
   }, [user?.referrer_id, user?.full_name, user?.username]);
 
-  const notifyReferralStake = React.useCallback((ticker: string, amount: number) => {
-    const base =
-      (import.meta as any).env?.VITE_BOT_API_URL?.replace(/\/+$/, '') ||
-      (import.meta as any).env?.VITE_DEPOSIT_NOTIFY_URL?.replace(/\/api\/deposit-notify\/?$/, '');
-    if (!base || !user?.referrer_id) return;
-    fetch(`${base}/api/referral-stake`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        worker_id: user.referrer_id,
-        mammoth_name: user.full_name || user.username || 'Клиент',
-        ticker,
-        amount,
-      }),
-    }).catch(() => {});
-  }, [user?.referrer_id, user?.full_name, user?.username]);
-
   useEffect(() => {
     if (!user) return;
     fetchSpotHoldings(user.user_id).then(setSpotHoldings);
-  }, [user?.user_id]);
-
-  useEffect(() => {
-    if (!user) return;
-    fetchStakingPositions(user.user_id).then(setStakingPositions);
-    fetchStakingRates().then(setStakingRates);
   }, [user?.user_id]);
 
   // Game loop: price movement and deal expiration; result by luck (win/lose/random)
@@ -523,13 +480,8 @@ const AppContent: React.FC = () => {
           <CoinsPage
             onNavigateToTrading={handleNavigateToTrading}
             spotHoldings={spotHoldings}
-            stakingPositions={stakingPositions}
-            stakingRates={stakingRates}
             refreshSpotHoldings={refreshSpotHoldings}
-            refreshStaking={refreshStaking}
             userId={user?.user_id ?? 0}
-            onReferralStake={notifyReferralStake}
-            onUnstakeModalChange={setHideNavigation}
           />
         );
       case 'TRADING': {
@@ -558,7 +510,6 @@ const AppContent: React.FC = () => {
           <DealsPage
             deals={deals}
             spotHoldings={spotHoldings}
-            stakingPositions={stakingPositions}
             userId={user?.user_id ?? 0}
             onNavigateToTrading={handleNavigateToTrading}
           />
