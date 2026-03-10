@@ -60,7 +60,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
   const { user, tgid } = useUser();
   const { webUserId } = useWebAuth();
   const { requirePin } = usePin();
-  const { formatPrice, convertFromRub, symbol, currencyCode } = useCurrency();
+  const { formatPrice, convertFromRub, convertToRub, symbol, currencyCode } = useCurrency();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>('TRADE');
   const [tradeType, setTradeType] = useState<'futures' | 'spot'>(initialTradeType ?? 'futures');
@@ -171,17 +171,18 @@ const TradingPage: React.FC<TradingPageProps> = ({
         return;
       }
       Haptic.light();
-      const numAmount = parseInt(amount) || 0;
-      if (numAmount <= 0) {
+      const displayAmount = parseFloat(amount.replace(',', '.')) || 0;
+      const amountRub = convertToRub(displayAmount);
+      if (amountRub <= 0) {
           Haptic.error();
           return;
       }
-      if (numAmount < MIN_DEAL_RUB) {
+      if (amountRub < MIN_DEAL_RUB) {
           Haptic.error();
           toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_RUB) })} ${symbol}`, 'error');
           return;
       }
-      if (numAmount > balance) {
+      if (amountRub > balance) {
           Haptic.error();
           toast.show(t('insufficient_balance'), 'error');
           return;
@@ -195,12 +196,13 @@ const TradingPage: React.FC<TradingPageProps> = ({
       
       // Animation delay before actually creating deal and navigating
       setTimeout(() => {
-          const numAmount = parseInt(amount) || 0;
+          const displayAmount = parseFloat(amount.replace(',', '.')) || 0;
+          const amountRub = Math.max(0, Math.round(convertToRub(displayAmount)));
           const newDeal: Deal = {
             id: Date.now().toString(),
             assetTicker: asset.ticker,
             side: side,
-            amount: numAmount,
+            amount: amountRub,
             leverage: leverage,
             entryPrice: livePrice,
             startTime: Date.now(),
@@ -214,7 +216,8 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   const handleSpotBuy = async () => {
     if (!userIdNum || livePrice <= 0) return;
-    const amountRub = parseFloat(spotAmountRub) || 0;
+    const displayAmount = parseFloat(spotAmountRub.replace(',', '.')) || 0;
+    const amountRub = convertToRub(displayAmount);
     if (amountRub < MIN_DEAL_RUB) {
       toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_RUB) })} ${symbol}`, 'error');
       return;
@@ -542,15 +545,18 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                     </div>
                                 </div>
                                 {/* Расчёт: получите ≈ X {ticker} */}
-                                {livePrice > 0 && parseFloat(spotAmountRub) >= MIN_DEAL_RUB && (
-                                    <div className="rounded-lg border border-border bg-card px-2 py-1.5 flex items-center justify-between gap-2">
-                                        <span className="text-[10px] text-neutral-500 uppercase font-bold">{t('you_receive')}</span>
-                                        <span className="text-xs font-mono font-bold text-neon">
-                                            ≈ {(parseFloat(spotAmountRub) || 0) / livePrice > 0
-                                                ? ((parseFloat(spotAmountRub) || 0) / livePrice).toFixed(8)
-                                                : '0'} {asset.ticker}
-                                        </span>
-                                    </div>
+                                {livePrice > 0 && parseFloat(spotAmountRub.replace(',', '.')) >= MIN_DEAL_RUB && (
+                                  <div className="rounded-lg border border-border bg-card px-2 py-1.5 flex items-center justify-between gap-2">
+                                    <span className="text-[10px] text-neutral-500 uppercase font-bold">{t('you_receive')}</span>
+                                    <span className="text-xs font-mono font-bold text-neon">
+                                      ≈ {(() => {
+                                        const displayAmount = parseFloat(spotAmountRub.replace(',', '.')) || 0;
+                                        const base = livePrice > 0 ? convertToRub(displayAmount) / livePrice : 0;
+                                        const value = base > 0 ? base.toFixed(8) : '0';
+                                        return `${value} ${asset.ticker}`;
+                                      })()}
+                                    </span>
+                                  </div>
                                 )}
                                 <p className="text-[9px] text-neutral-500 px-0.5 leading-tight">{t('spot_buy_note')}</p>
                                 <button
@@ -831,10 +837,12 @@ const TradingPage: React.FC<TradingPageProps> = ({
                             {side === 'UP' ? `${t('long')} (${t('up')})` : `${t('short')} (${t('down')})`}
                         </span>
                     </div>
-                     <div className="flex justify-between items-center text-sm">
+                    <div className="flex justify-between items-center text-sm">
                         <span className="text-neutral-400">{t('amount_leverage')}</span>
                         <div className="text-right">
-                             <span className="font-mono text-white block">{formatPrice(parseInt(amount) || 0)} {symbol} x{leverage}</span>
+                             <span className="font-mono text-white block">
+                               {formatPrice(convertToRub(parseFloat(amount.replace(',', '.')) || 0))} {symbol} x{leverage}
+                             </span>
                         </div>
                     </div>
                     <div className="flex justify-between items-center text-sm">
@@ -889,13 +897,15 @@ const TradingPage: React.FC<TradingPageProps> = ({
                 <>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-neutral-400">{t('amount_label')}</span>
-                    <span className="font-mono text-white">{formatPrice(parseFloat(spotAmountRub) || 0)} {symbol}</span>
+                    <span className="font-mono text-white">
+                      {formatPrice(convertToRub(parseFloat(spotAmountRub.replace(',', '.')) || 0))} {symbol}
+                    </span>
                   </div>
                   {livePrice > 0 && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-neutral-400">{t('you_receive')}</span>
                       <span className="font-mono text-neon">
-                        ≈ {((parseFloat(spotAmountRub) || 0) / livePrice).toFixed(8)} {asset.ticker}
+                        ≈ {(convertToRub(parseFloat(spotAmountRub.replace(',', '.')) || 0) / livePrice).toFixed(8)} {asset.ticker}
                       </span>
                     </div>
                   )}

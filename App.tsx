@@ -467,7 +467,6 @@ const AppContent: React.FC = () => {
         return (
           <HomePage
             balance={balance}
-            spotHoldings={spotHoldings}
             user={user}
             onNavigate={handleNavigate}
             onNavigateToTrading={handleNavigateToTrading}
@@ -549,7 +548,6 @@ const AppContent: React.FC = () => {
         return (
           <HomePage
             balance={balance}
-            spotHoldings={spotHoldings}
             user={user}
             onNavigate={handleNavigate}
             onNavigateToTrading={handleNavigateToTrading}

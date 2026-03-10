@@ -607,6 +607,14 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit }) => {
                 {method === 'CRYPTO' ? t('deposit_instruction_crypto') : t('deposit_instruction_card')}
             </div>
 
+            <button
+                type="button"
+                onClick={() => { Haptic.tap(); clearDepositSession(); setStep('METHOD'); }}
+                className="w-full py-3 mb-3 border border-neutral-600 text-neutral-300 rounded-xl font-medium active:scale-[0.98] transition-transform hover:bg-white/5"
+            >
+                {t('deposit_close_deal')}
+            </button>
+
             <button 
                 onClick={handleNext}
                 disabled={isGuest && !guestContact.trim()}

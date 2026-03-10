@@ -162,12 +162,12 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => Haptic.tap()}
-              className="block w-full pl-10 pr-3 py-3 bg-surface border border-neutral-800 rounded-xl leading-5 text-white placeholder-neutral-600 focus:outline-none focus:border-neon/50 focus:ring-1 focus:ring-neon/50 focus:bg-neutral-900 transition-all font-mono text-sm"
+              className="block w-full pl-10 pr-3 py-2.5 bg-card border border-border/60 rounded-lg leading-5 text-white placeholder-neutral-600 focus:outline-none focus:border-neon/40 focus:ring-0 focus:bg-card transition-all font-mono text-sm"
             />
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar px-4 py-2 border-b border-border">
+        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar px-4 py-1.5 border-b border-border/60">
           {filters.map((filter) => (
             <button
               key={filter.key}
@@ -176,8 +176,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                 setActiveFilter(filter.key);
               }}
               className={`
-                whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wide transition-all active:scale-95
-                ${activeFilter === filter.key ? 'bg-neon text-black font-bold border border-neon' : 'text-textSecondary hover:text-textPrimary hover:bg-card border border-transparent'}
+                whitespace-nowrap px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wide transition-all active:scale-95
+                ${activeFilter === filter.key ? 'bg-card text-neon font-semibold border border-neon/50' : 'text-textSecondary hover:text-textPrimary hover:bg-card/60 border border-transparent'}
               `}
             >
               {t(filter.labelKey)}

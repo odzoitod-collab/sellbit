@@ -28,7 +28,7 @@ function CoinChip({
         Haptic.tap();
         onAssetClick(asset);
       }}
-      className="flex-shrink-0 flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-left hover:border-neon transition-all active:scale-[0.98]"
+      className="flex-shrink-0 flex items-center gap-2 rounded-md border border-border/60 bg-card/80 px-2.5 py-1.5 text-left hover:border-neon/50 hover:bg-card transition-all active:scale-[0.98]"
     >
       <span className="font-mono font-semibold text-white text-xs">
         {asset.ticker}
