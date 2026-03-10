@@ -186,7 +186,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         </div>
       </div>
 
-      <div className="px-4 pb-28 pt-2 min-h-screen">
+      <div className="px-4 pb-56 pt-2 min-h-screen">
         {/* Стейкинг убран: блок ниже больше не показывается */}
         {false && userId > 0 && (
           <section className="mb-4">
@@ -265,12 +265,15 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         )}
 
         {filteredAssets.length > 0 ? (
-          <AssetTable
-            assets={filteredAssets}
-            onAssetClick={onNavigateToTrading}
-            externalFilter={activeFilter}
-            hideFilterBar={true}
-          />
+          <>
+            <AssetTable
+              assets={filteredAssets}
+              onAssetClick={onNavigateToTrading}
+              externalFilter={activeFilter}
+              hideFilterBar={true}
+            />
+            <div className="h-24" />
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-neutral-600 space-y-2">
             <Search size={32} className="opacity-20" />

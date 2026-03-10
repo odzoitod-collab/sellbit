@@ -101,6 +101,16 @@
 - Появление страниц: `animate-fade-in` (opacity + translateY 8px, 0.2s ease-out).  
 - Модалки и оверлеи: те же классы при необходимости, z-index 60–200 в зависимости от слоя (меню 50, модалки 100, пин/онбординг 200).  
 - Кнопки: `active:scale-95` / `active:scale-[0.98]`, `transition-transform` / `transition-all duration-200`.
+- **Переходы модалок и вкладок**: `cubic-bezier(0.4, 0, 0.2, 1)` (класс `transition-modal`, переменная `--ease-modal` в `index.html`).
+- **Order Book Flash**: при изменении цены — мягкая подсветка зелёным (рост) или красным (падение) с затуханием 300ms (классы `animate-flash-up`, `animate-flash-down`).
+- **Hover**: строки таблиц — `hover-row` (лёгкий фон), кнопки CTA — `hover-glow` (тонкое свечение границы).
+
+### Сетка отступов и CSS-переменные (торговый экран)
+- **Базовая сетка**: 4px / 8px (в Tailwind: `p-1` = 4px, `p-2` = 8px, `p-4` = 16px; в `index.html` добавлены токены `panel`, `block`, `table`).
+- **Визуальная иерархия**: внешние отступы между блоками (стакан, график, форма) — 16–24px (`gap-4` / `gap-6`, `mt-6`); внутренние отступы в таблицах стакана — минимальные (`py-[2px]`, `px-2`) для плотности данных.
+- **Заголовки панелей**: больше «воздуха» — `py-3` в шапке стакана, отступ между секциями формы `gap-4`.
+- **Переменные в `:root`** (в `<style>` в `index.html`): `--ease-modal`, `--duration-flash`, `--duration-modal`, `--color-flash-up`, `--color-flash-down`, `--border-subtle`, `--border-beam`. Учитывается `prefers-reduced-motion: reduce`.
+- **Пример на чистом CSS**: ключи `flash-up` / `flash-down` и классы `.animate-flash-up` / `.animate-flash-down`. Для Framer Motion: модалка — `transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}`, flash — `animate={{ backgroundColor: [color, 'transparent'] }}` с duration 0.3.
 
 ### Тема Tailwind (index.html)
 - **Цвета**: `background: '#050505'`, `surface: '#0a0a0a'`, `neon: '#a3e635'`, `subtle: '#1f1f1f'`.  

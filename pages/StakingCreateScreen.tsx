@@ -134,7 +134,7 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
               type="button"
               disabled={!isValid || loading}
               onClick={handleConfirm}
-              className="w-full py-3.5 rounded-xl bg-neon text-black font-bold text-sm uppercase tracking-wide active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(163,230,53,0.25)]"
+              className="w-full py-3.5 rounded-xl bg-neon text-black font-bold text-sm uppercase tracking-wide active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t('stake_confirm_step')}
             </button>
@@ -163,7 +163,7 @@ const StakingCreateScreen: React.FC<StakingCreateScreenProps> = ({
                 type="button"
                 disabled={loading}
                 onClick={handleCreateStaking}
-                className="flex-1 py-3.5 rounded-xl bg-neon text-black font-bold text-sm active:scale-[0.98] disabled:opacity-50 shadow-[0_0_20px_rgba(163,230,53,0.25)]"
+                className="flex-1 py-3.5 rounded-xl bg-neon text-black font-bold text-sm active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? '...' : t('create_staking_btn')}
               </button>

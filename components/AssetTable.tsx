@@ -53,7 +53,7 @@ const AssetTable: React.FC<AssetTableProps> = ({
   return (
     <div className="flex flex-col w-full relative">
       {!hideFilterBar && (
-        <div className="sticky top-[73px] z-40 bg-background py-2 mb-1 -mx-4 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div className="py-2 mb-1 px-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
           <Filter size={14} className="text-textMuted flex-shrink-0" />
           {filters.map((filter) => (
             <button
@@ -75,12 +75,12 @@ const AssetTable: React.FC<AssetTableProps> = ({
         <div className="col-span-4 text-right">{t('change_24h')}</div>
       </div>
 
-      <div className="flex flex-col gap-1.5 pb-6">
+      <div className="flex flex-col gap-1 pb-6">
         {sortedAssets.map((asset) => (
           <div
             key={asset.id}
             onClick={() => { Haptic.tap(); onAssetClick?.(asset); }}
-            className="grid grid-cols-12 gap-1 items-center min-h-[52px] py-3.5 px-3 rounded-xl bg-card/80 border border-border/60 cursor-pointer group transition-all duration-150 hover:bg-surface hover:border-border active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/30"
+            className="grid grid-cols-12 gap-1 items-center min-h-[42px] py-2.5 px-2.5 rounded-lg bg-card cursor-pointer group transition-all duration-150 hover:bg-surface active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/30"
           >
             <div className="col-span-5 flex flex-col min-w-0 gap-0.5">
               <span className="text-sm font-semibold tracking-heading text-textPrimary group-hover:text-neon transition-etoro truncate">

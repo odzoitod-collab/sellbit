@@ -63,6 +63,22 @@
               'etoro': 'cubic-bezier(0.4, 0, 0.2, 1)',
               'etoro-smooth': 'cubic-bezier(0.25, 0.8, 0.25, 1)',
             },
+            /* Сетка 4px/8px: spacing для блоков и плотных таблиц */
+            spacing: {
+              '0.5': '2px',
+              '1': '4px',
+              '2': '8px',
+              '3': '12px',
+              '4': '16px',
+              '5': '20px',
+              '6': '24px',
+              '8': '32px',
+              '10': '40px',
+              '12': '48px',
+              'panel': '16px',   /* внешние отступы панелей */
+              'block': '24px',   /* между логическими блоками (стакан/график/форма) */
+              'table': '4px',    /* внутренние отступы в таблицах (data density) */
+            },
             backdropBlur: {
               glass: '12px',
               modal: '16px',
@@ -72,6 +88,26 @@
       }
     </script>
     <style>
+      /* --- Design tokens: 4/8px grid, motion, colors --- */
+      :root {
+        --space-unit: 4px;
+        --space-2: 8px;
+        --space-4: 16px;
+        --space-6: 24px;
+        --space-8: 32px;
+        --ease-modal: cubic-bezier(0.4, 0, 0.2, 1);
+        --duration-flash: 300ms;
+        --duration-modal: 280ms;
+        --color-flash-up: rgba(16, 185, 129, 0.35);
+        --color-flash-down: rgba(248, 113, 113, 0.35);
+        --border-subtle: 1px solid rgba(42, 46, 57, 0.8);
+        --border-beam: 0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        :root { --duration-flash: 0ms; --duration-modal: 0ms; }
+      }
+
       html {
         touch-action: manipulation;
         -webkit-text-size-adjust: 100%;
@@ -138,7 +174,7 @@
         to { opacity: 1; transform: translateY(0); }
       }
       .animate-slide-up {
-        animation: slide-up 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+        animation: slide-up 0.28s var(--ease-modal) forwards;
       }
       @keyframes sheet-up {
         from { opacity: 0; transform: translateY(100%); }
@@ -152,7 +188,7 @@
         to { opacity: 1; transform: scale(1); }
       }
       .animate-modal-in {
-        animation: modal-scale-in 0.22s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+        animation: modal-scale-in var(--duration-modal) var(--ease-modal) forwards;
       }
       @keyframes slide-in-right {
         from { opacity: 0; transform: translateX(20px); }
@@ -213,6 +249,45 @@
       .animate-chart-in {
         animation: chart-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
       }
+
+      /* Order Book: Flash effect — мягкая смена цвета при обновлении цены (300ms) */
+      @keyframes flash-up {
+        from { background-color: var(--color-flash-up); }
+        to { background-color: transparent; }
+      }
+      @keyframes flash-down {
+        from { background-color: var(--color-flash-down); }
+        to { background-color: transparent; }
+      }
+      .animate-flash-up {
+        animation: flash-up var(--duration-flash) var(--ease-modal) forwards;
+      }
+      .animate-flash-down {
+        animation: flash-down var(--duration-flash) var(--ease-modal) forwards;
+      }
+
+      /* Модалки и вкладки: cubic-bezier(0.4, 0, 0.2, 1) */
+      .transition-modal {
+        transition: opacity var(--duration-modal) var(--ease-modal),
+                    transform var(--duration-modal) var(--ease-modal);
+      }
+
+      /* Hover: деликатное подсвечивание строк и кнопок */
+      .hover-row:hover {
+        background-color: rgba(255, 255, 255, 0.04);
+        transition: background-color 0.15s var(--ease-modal);
+      }
+      .hover-glow:focus-visible,
+      .hover-glow:hover {
+        box-shadow: 0 0 0 1px rgba(33, 176, 83, 0.25);
+        transition: box-shadow 0.2s var(--ease-modal);
+      }
+
+      /* Тонкий разделитель вместо жёсткой линии */
+      .border-subtle {
+        border: var(--border-subtle);
+      }
+
       /* Полноэкранный оверлей под модалки и экраны */
       .fullscreen-overlay {
         position: fixed;

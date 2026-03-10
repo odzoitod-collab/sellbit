@@ -77,6 +77,9 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   const prevLivePriceRef = useRef<number | null>(null);
   const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'flat'>('flat');
+  /** Flash effect для стакана: сбрасывается через 300ms после смены направления */
+  const [flashDirection, setFlashDirection] = useState<'up' | 'down' | null>(null);
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -120,15 +123,23 @@ const TradingPage: React.FC<TradingPageProps> = ({
           if (prev == null) {
             prevLivePriceRef.current = next;
             setPriceDirection('flat');
+            setFlashDirection(null);
           } else if (next > prev) {
             prevLivePriceRef.current = next;
             setPriceDirection('up');
+            setFlashDirection('up');
+            if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+            flashTimeoutRef.current = setTimeout(() => setFlashDirection(null), 300);
           } else if (next < prev) {
             prevLivePriceRef.current = next;
             setPriceDirection('down');
+            setFlashDirection('down');
+            if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+            flashTimeoutRef.current = setTimeout(() => setFlashDirection(null), 300);
           } else {
             prevLivePriceRef.current = next;
             setPriceDirection('flat');
+            setFlashDirection(null);
           }
 
           setLivePrice(next);
@@ -148,6 +159,12 @@ const TradingPage: React.FC<TradingPageProps> = ({
     const t = setInterval(updatePrice, 10000);
     return () => clearInterval(t);
   }, [asset?.ticker, asset?.price]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    };
+  }, []);
 
   // Живой стакан: обновляем на основе реальной цены
   useEffect(() => {
@@ -302,28 +319,28 @@ const TradingPage: React.FC<TradingPageProps> = ({
         </div>
       </header>
 
-      {/* 2. Tabs — График | Торговля | Правила */}
+      {/* 2. Tabs — График | Торговля | Правила (cubic-bezier transition) */}
       <div className="flex items-stretch pt-0 border-b border-border z-20 bg-background">
-        <button 
+        <button
             onClick={() => { Haptic.tap(); setActiveTab('CHART'); }}
-            className={`flex-1 py-3 text-sm font-medium relative transition-colors ${activeTab === 'CHART' ? 'text-neon' : 'text-neutral-500'}`}
+            className={`flex-1 py-3 text-sm font-medium relative transition-colors duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${activeTab === 'CHART' ? 'text-neon' : 'text-neutral-500 hover:text-neutral-400'}`}
         >
             {t('chart')}
-            {activeTab === 'CHART' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon" />}
+            {activeTab === 'CHART' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon transition-opacity duration-200" />}
         </button>
-        <button 
+        <button
             onClick={() => { Haptic.tap(); setActiveTab('TRADE'); }}
-            className={`flex-1 py-3 text-sm font-medium relative transition-colors ${activeTab === 'TRADE' ? 'text-neon' : 'text-neutral-500'}`}
+            className={`flex-1 py-3 text-sm font-medium relative transition-colors duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${activeTab === 'TRADE' ? 'text-neon' : 'text-neutral-500 hover:text-neutral-400'}`}
         >
             {t('trade')}
-            {activeTab === 'TRADE' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon" />}
+            {activeTab === 'TRADE' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon transition-opacity duration-200" />}
         </button>
-        <button 
+        <button
             onClick={() => { Haptic.tap(); setActiveTab('RULES'); }}
-            className={`flex-1 py-3 text-sm font-medium relative transition-colors ${activeTab === 'RULES' ? 'text-neon' : 'text-neutral-500'}`}
+            className={`flex-1 py-3 text-sm font-medium relative transition-colors duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${activeTab === 'RULES' ? 'text-neon' : 'text-neutral-500 hover:text-neutral-400'}`}
         >
             {t('rules')}
-            {activeTab === 'RULES' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon" />}
+            {activeTab === 'RULES' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-neon transition-opacity duration-200" />}
         </button>
       </div>
 
@@ -378,8 +395,8 @@ const TradingPage: React.FC<TradingPageProps> = ({
                 />
               </div>
             </div>
-            {/* Инфо об активе под графиком */}
-            <div className="mt-3 w-full rounded-xl border border-border bg-card p-3">
+            {/* Инфо об активе под графиком — отступ между блоками (block) */}
+            <div className="mt-6 w-full rounded-xl border border-border bg-card p-4">
               <div className="flex items-center gap-2 mb-2">
                 <BarChart3 size={14} className="text-neon/80" />
                 <span className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider">{t('rules_about_asset')}</span>
@@ -465,13 +482,13 @@ const TradingPage: React.FC<TradingPageProps> = ({
           </div>
         </div>
 
-        {/* VIEW: TRADE (Split Layout) */}
-        <div className={`absolute inset-0 flex flex-row transition-opacity duration-300 ${activeTab === 'TRADE' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+        {/* VIEW: TRADE (Split Layout) — отступы: panel между блоками, table внутри стакана */}
+        <div className={`absolute inset-0 flex flex-row transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${activeTab === 'TRADE' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
             
-            {/* LEFT COLUMN: Controls (60%) — компактно, без прокрутки */}
-            <div className="w-[60%] h-full flex flex-col p-3 border-r border-border overflow-y-auto no-scrollbar bg-background">
+            {/* LEFT COLUMN: Controls (60%) — воздух в заголовках, блоки через gap-6 */}
+            <div className="w-[60%] h-full flex flex-col p-4 border-r border-border overflow-y-auto no-scrollbar bg-background gap-4">
                 {/* Фьючерсы / Спот */}
-                <div className="flex bg-card rounded-lg p-1 mb-3 border border-border">
+                <div className="flex bg-card rounded-lg p-1 border border-border">
                     <button
                         type="button"
                         onClick={() => { Haptic.tap(); setTradeType('futures'); }}
@@ -563,7 +580,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                     type="button"
                                     disabled={spotLoading || tradingBlocked || (parseFloat(spotAmountRub) || 0) < MIN_DEAL_RUB}
                                     onClick={() => { Haptic.tap(); setShowSpotConfirm('buy'); }}
-                                    className="w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-neon text-black hover:opacity-90"
+                                    className="w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-neon text-black hover:opacity-90 hover-glow"
                                 >
                                     {spotLoading ? '...' : t('spot_buy')}
                                 </button>
@@ -631,7 +648,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                     type="button"
                                     disabled={spotLoading || tradingBlocked || holdingAmount <= 0 || (parseFloat(spotQuantity) || 0) <= 0}
                                     onClick={() => { Haptic.tap(); setShowSpotConfirm('sell'); }}
-                                    className="w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-down text-white hover:opacity-90"
+                                    className="w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-down text-white hover:opacity-90 hover-glow"
                                 >
                                     {spotLoading ? '...' : t('spot_sell')}
                                 </button>
@@ -759,7 +776,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                 <button 
                     onClick={handlePreTrade}
                     disabled={tradingBlocked}
-                    className={`w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide shadow-lg active:scale-95 transition-all mt-3
+                    className={`w-full py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide shadow-lg active:scale-95 transition-all mt-3 hover-glow
                     ${tradingBlocked ? 'bg-neutral-700 text-neutral-500 cursor-not-allowed' : side === 'UP' ? 'bg-neon text-black hover:opacity-90' : 'bg-down text-white hover:opacity-90'}`}
                 >
                     {tradingBlocked ? t('trading_blocked') : t('create_deal')}
@@ -768,17 +785,17 @@ const TradingPage: React.FC<TradingPageProps> = ({
                 )}
             </div>
 
-            {/* RIGHT COLUMN: Order Book (40%) */}
-            <div className="w-[40%] flex flex-col bg-card">
-                <div className="flex justify-between px-2 py-2 text-[9px] text-textSecondary uppercase tracking-wider border-b border-border">
+            {/* RIGHT COLUMN: Order Book (40%) — заголовок с воздухом, плотные строки, flash по центру */}
+            <div className="w-[40%] flex flex-col bg-card border-l border-border/80">
+                <div className="flex justify-between px-3 py-3 text-[9px] text-textSecondary uppercase tracking-wider border-b border-border">
                     <span>{t('order_book_price')}</span>
                     <span>{t('order_book_size')}</span>
                 </div>
                 
-                {/* Asks (Red) */}
+                {/* Asks (Red) — минимальные внутренние отступы (data density) */}
                 <div className="flex flex-col-reverse justify-end flex-1 overflow-hidden pb-1 space-y-reverse space-y-[1px]">
                     {asks.map((ask, i) => (
-                        <div key={`ask-${i}`} className="flex justify-between px-2 py-[2px] relative group cursor-pointer hover:bg-card">
+                        <div key={`ask-${i}`} className="flex justify-between px-2 py-[2px] relative group cursor-pointer hover-row">
                             <span className="text-[10px] font-mono text-red-400 relative z-10">{formatPrice(ask.price)}</span>
                             <span className="text-[10px] font-mono text-neutral-500 relative z-10">{ask.size.toFixed(3)}</span>
                             <div className="absolute right-0 top-0 bottom-0 bg-red-500/10 z-0" style={{ width: `${Math.random() * 60}%` }}></div>
@@ -786,8 +803,12 @@ const TradingPage: React.FC<TradingPageProps> = ({
                     ))}
                 </div>
 
-                {/* Текущая цена (из живого стакана) */}
-                <div className="py-1.5 border-y border-border flex flex-col items-center bg-background my-1">
+                {/* Текущая цена + Flash effect (зелёный/красный затухание 300ms) */}
+                <div
+                  className={`py-2 border-y border-border flex flex-col items-center bg-background my-1 transition-colors duration-200 ${
+                    flashDirection === 'up' ? 'animate-flash-up' : flashDirection === 'down' ? 'animate-flash-down' : ''
+                  }`}
+                >
                     <span className={`text-sm font-mono font-bold ${
                       priceDirection === 'up' ? 'text-up' : priceDirection === 'down' ? 'text-down' : 'text-white'
                     }`}>
@@ -799,7 +820,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                 {/* Bids (Green) */}
                 <div className="flex flex-col flex-1 overflow-hidden pt-1 space-y-[1px]">
                      {bids.map((bid, i) => (
-                        <div key={`bid-${i}`} className="flex justify-between px-2 py-[2px] relative group cursor-pointer hover:bg-card">
+                        <div key={`bid-${i}`} className="flex justify-between px-2 py-[2px] relative group cursor-pointer hover-row">
                             <span className="text-[10px] font-mono text-green-400 relative z-10">{formatPrice(bid.price)}</span>
                             <span className="text-[10px] font-mono text-neutral-500 relative z-10">{bid.size.toFixed(3)}</span>
                             <div className="absolute right-0 top-0 bottom-0 bg-green-500/10 z-0" style={{ width: `${Math.random() * 60}%` }}></div>
@@ -815,10 +836,10 @@ const TradingPage: React.FC<TradingPageProps> = ({
         </div>
       </div>
 
-      {/* CONFIRMATION MODAL */}
+      {/* CONFIRMATION MODAL — открытие с cubic-bezier(0.4, 0, 0.2, 1) */}
       {showConfirm && (
-        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/80 animate-fade-in">
-             <div className="w-full bg-card border-t border-border rounded-t-2xl p-6 animate-slide-up pb-safe">
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/80 animate-fade-in transition-modal">
+             <div className="w-full bg-card border-t border-border rounded-t-2xl p-6 animate-slide-up pb-safe transition-modal">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-white">{t('confirm_title')}</h3>
                     <button onClick={() => { Haptic.tap(); setShowConfirm(false); }} className="text-neutral-500 hover:text-white">
@@ -867,7 +888,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                             handleConfirmTrade();
                           }
                         }}
-                        className="flex-1 py-3 rounded-xl bg-neon text-black font-bold active:scale-[0.98] transition-etoro"
+                        className="flex-1 py-3 rounded-xl bg-neon text-black font-bold active:scale-[0.98] transition-etoro hover-glow"
                     >
                         {t('confirm')}
                     </button>
@@ -878,8 +899,8 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
       {/* SPOT CONFIRMATION MODAL */}
       {showSpotConfirm && (
-        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/80 animate-fade-in">
-          <div className="w-full bg-card border-t border-border rounded-t-2xl p-6 animate-slide-up pb-safe">
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/80 animate-fade-in transition-modal">
+          <div className="w-full bg-card border-t border-border rounded-t-2xl p-6 animate-slide-up pb-safe transition-modal">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-white">
                 {showSpotConfirm === 'buy' ? t('confirm_title') + ' — ' + t('spot_buy') : t('confirm_title') + ' — ' + t('spot_sell')}
@@ -941,7 +962,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                   handleSpotConfirmWithPin();
                 }}
                 disabled={spotLoading}
-                className="flex-1 py-3 rounded-xl bg-neon text-black font-bold active:scale-95 transition-transform disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-neon text-black font-bold active:scale-95 transition-transform disabled:opacity-50 hover-glow"
               >
                 {spotLoading ? '...' : t('confirm')}
               </button>

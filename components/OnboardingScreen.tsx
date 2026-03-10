@@ -101,7 +101,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onNext }) => {
         <button
           type="button"
           onClick={handleNext}
-          className="w-full py-4 rounded-2xl bg-neon/90 text-black font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-[0_0_20px_rgba(163,230,53,0.2)]"
+          className="w-full py-4 rounded-2xl bg-neon/90 text-black font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
         >
           {isLast ? t('create_password_btn') : t('next')}
           <ChevronRight size={20} strokeWidth={2.5} />

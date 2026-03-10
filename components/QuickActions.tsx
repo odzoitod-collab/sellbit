@@ -30,7 +30,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate }) => {
             className={`
               h-14 w-14 sm:h-16 sm:w-16 rounded-full flex items-center justify-center transition-colors duration-200 border flex-shrink-0
               ${action.highlight
-                ? 'bg-neon text-black border-neon shadow-[0_0_20px_rgba(33,176,83,0.25)]'
+                ? 'bg-neon text-black border-neon'
                 : 'bg-card text-white border-border hover:bg-surface hover:border-white/10'
               }
             `}

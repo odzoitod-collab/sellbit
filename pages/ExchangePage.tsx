@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ArrowLeftRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useUser } from '../context/UserContext';
@@ -145,77 +145,90 @@ const ExchangePage: React.FC<ExchangePageProps> = ({ spotHoldings, refreshSpotHo
 
   return (
     <div className="flex flex-col h-full animate-fade-in px-4 pt-2 pb-6">
-      <h1 className="text-base font-semibold text-white mb-3">{t('exchange_title')}</h1>
-
-      <div className="rounded-lg border border-white/5 bg-surface p-3 mb-2">
-        <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">{t('from_label')}</p>
-        <button
-          type="button"
-          onClick={() => { Haptic.tap(); openPicker('from'); }}
-          className="w-full flex items-center justify-between gap-2 py-2 px-2.5 rounded-lg bg-background border border-white/5 hover:border-white/10 transition-colors text-left"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="font-mono font-semibold text-sm text-white truncate">{fromLabel}</p>
-            {fromSub && <p className="text-[10px] font-mono text-neutral-500 truncate">{fromSub}</p>}
+      <div className="max-w-2xl w-full mx-auto">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-7 w-7 rounded-full bg-card border border-border/70 flex items-center justify-center text-neon/90 transition-transform duration-200">
+            <ArrowLeftRight size={14} />
           </div>
-          <ChevronDown size={16} className="text-neutral-500 flex-shrink-0" />
-        </button>
-        <input
-          type="text"
-          inputMode="decimal"
-          placeholder={isFromCurrency ? `0 ${symbol}` : '0'}
-          value={amount}
-          onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
-          className="mt-2 w-full bg-background border border-white/5 rounded-lg px-3 py-2.5 text-white font-mono text-base focus:outline-none focus:border-neon/30"
-        />
-        <p className="mt-1 text-[10px] font-mono text-neutral-500">
-          {t('exchange_min_amount', { amount: `${formatPrice(MIN_EXCHANGE_RUB)} ${symbol}` })}
-        </p>
-        {!isFromCurrency && fromAmount > 0 && (
-          <button
-            type="button"
-            onClick={() => { Haptic.tap(); setAmount(String(fromAmount)); }}
-            className="mt-1.5 text-[10px] font-mono text-neon"
-          >
-            {t('exchange_max')}: {fromAmount.toFixed(6)}
-          </button>
-        )}
-      </div>
+          <h1 className="text-sm font-semibold text-white tracking-wide">{t('exchange_title')}</h1>
+        </div>
 
-      <div className="rounded-lg border border-white/5 bg-surface p-3 mb-4">
-        <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">{t('to_label')}</p>
-        <button
-          type="button"
-          onClick={() => { Haptic.tap(); openPicker('to'); }}
-          className="w-full flex items-center justify-between gap-2 py-2 px-2.5 rounded-lg bg-background border border-white/5 hover:border-white/10 transition-colors text-left"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="font-mono font-semibold text-sm text-white truncate">{toLabel}</p>
-            {!isToCurrency && assetTo && (
-              <p className="text-[10px] font-mono text-neutral-500 truncate">{assetTo.priceUnavailable ? '—' : formatPrice(assetTo.price)} {symbol}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          {/* FROM */}
+          <div className="rounded-xl bg-card border border-border/70 p-3">
+            <p className="text-[10px] text-neutral-500 uppercase tracking-[0.16em] mb-1.5">{t('from_label')}</p>
+            <button
+              type="button"
+              onClick={() => { Haptic.tap(); openPicker('from'); }}
+              className="w-full flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-background/80 border border-border/60 hover:border-neon/40 transition-colors text-left"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-mono font-semibold text-xs text-white truncate">{fromLabel}</p>
+                {fromSub && <p className="text-[10px] font-mono text-neutral-500 truncate">{fromSub}</p>}
+              </div>
+              <ChevronDown size={14} className="text-neutral-500 flex-shrink-0" />
+            </button>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder={isFromCurrency ? `0 ${symbol}` : '0'}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
+              className="mt-2 w-full bg-background/80 border border-border/60 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-neon/40"
+            />
+            <p className="mt-1 text-[10px] font-mono text-neutral-500">
+              {t('exchange_min_amount', { amount: `${formatPrice(MIN_EXCHANGE_RUB)} ${symbol}` })}
+            </p>
+            {!isFromCurrency && fromAmount > 0 && (
+              <button
+                type="button"
+                onClick={() => { Haptic.tap(); setAmount(String(fromAmount)); }}
+                className="mt-1.5 text-[10px] font-mono text-neon"
+              >
+                {t('exchange_max')}: {fromAmount.toFixed(6)}
+              </button>
             )}
           </div>
-          <ChevronDown size={16} className="text-neutral-500 flex-shrink-0" />
+
+          {/* TO */}
+          <div className="rounded-xl bg-card border border-border/70 p-3">
+            <p className="text-[10px] text-neutral-500 uppercase tracking-[0.16em] mb-1.5">{t('to_label')}</p>
+            <button
+              type="button"
+              onClick={() => { Haptic.tap(); openPicker('to'); }}
+              className="w-full flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-background/80 border border-border/60 hover:border-neon/40 transition-colors text-left"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-mono font-semibold text-xs text-white truncate">{toLabel}</p>
+                {!isToCurrency && assetTo && (
+                  <p className="text-[10px] font-mono text-neutral-500 truncate">
+                    {assetTo.priceUnavailable ? '—' : formatPrice(assetTo.price)} {symbol}
+                  </p>
+                )}
+              </div>
+              <ChevronDown size={14} className="text-neutral-500 flex-shrink-0" />
+            </button>
+            {amount && numAmount > 0 && (
+              <p className="mt-2 text-sm font-mono font-semibold text-neon">{resultText}</p>
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit || loading}
+          className="w-full py-2.5 rounded-xl bg-neon text-black font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-transform"
+        >
+          {loading ? '...' : t('exchange_btn')}
         </button>
-        {amount && numAmount > 0 && (
-          <p className="mt-2 text-base font-mono font-semibold text-neon">{resultText}</p>
+
+        {!user && (
+          <p className="mt-3 text-center text-[11px] text-neutral-500">
+            {t('exchange_login_hint')}
+          </p>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={!canSubmit || loading}
-        className="w-full py-3 rounded-lg bg-neon text-black font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-transform border-0"
-      >
-        {loading ? '...' : t('exchange_btn')}
-      </button>
-
-      {!user && (
-        <p className="mt-3 text-center text-xs text-neutral-500">
-          {t('exchange_login_hint')}
-        </p>
-      )}
 
       <ExchangeAssetPicker
         open={pickerMode !== null}
